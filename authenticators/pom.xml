@@ -7,7 +7,8 @@
     <version>1.0.0</version>
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
-        <keycloak.version>24.0.2</keycloak.version>
+        <keycloak.version>24.0.3</keycloak.version>
+        <zxing.version>3.5.3</zxing.version>
     </properties>
 
     <dependencies>
@@ -29,17 +30,15 @@
             <version>${keycloak.version}</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- QR generation -->
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>core</artifactId>
-            <version>3.5.3</version>
+            <version>${zxing.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.zxing</groupId>
             <artifactId>javase</artifactId>
-            <version>3.5.3</version>
+            <version>${zxing.version}</version>
         </dependency>
     </dependencies>
 

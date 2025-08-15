@@ -1,4 +1,4 @@
-## Required Envs:
+## Required Envs (deprecated):
 
 ```
 KEYCLOAK_REALM=myrealm

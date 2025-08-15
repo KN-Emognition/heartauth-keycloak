@@ -19,6 +19,12 @@
           "requirement": "REQUIRED",
           "priority": 0,
           "authenticatorFlow": false
+        },
+        {
+          "authenticator": "ecg-authenticator",
+          "requirement": "REQUIRED",
+          "priority": 1,
+          "authenticatorFlow": false
         }
       ]
     },
@@ -57,8 +63,18 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        { "authenticator": "registration-user-creation",   "requirement": "REQUIRED", "priority": 0, "authenticatorFlow": false },
-        { "authenticator": "registration-password-action", "requirement": "REQUIRED", "priority": 1, "authenticatorFlow": false }
+        {
+          "authenticator": "registration-user-creation",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "registration-password-action",
+          "requirement": "REQUIRED",
+          "priority": 1,
+          "authenticatorFlow": false
+        }
       ]
     }
   ],
