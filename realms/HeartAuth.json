@@ -1,32 +1,17 @@
 {
-  "realm": "ecg-secure-realm",
+  "realm": "HeartAuth Showcase",
   "enabled": true,
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "loginTheme": "heartAuth",
-  "browserFlow": "ecg-browser",
-
+  "browserFlow": "heartAuth-browser",
+  "registrationFlow": "heartAuth-register",
   "authenticationFlows": [
     {
-      "alias": "ecg-browser",
-      "description": "Minimal browser flow with device enroll",
+      "alias": "heartAuth-browser",
+      "description": "Browser login only",
       "providerId": "basic-flow",
       "topLevel": true,
-      "builtIn": false,
-      "authenticationExecutions": [
-        {
-          "requirement": "REQUIRED",
-          "priority": 0,
-          "authenticatorFlow": true,
-          "flowAlias": "ecg-forms"
-        }
-      ]
-    },
-    {
-      "alias": "ecg-forms",
-      "description": "Username/password + device enroll",
-      "providerId": "basic-flow",
-      "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
         {
@@ -34,6 +19,22 @@
           "requirement": "REQUIRED",
           "priority": 0,
           "authenticatorFlow": false
+        }
+      ]
+    },
+    {
+      "alias": "heartAuth-register",
+      "description": "Default registration + device register at end",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "registration-page-form",
+          "requirement": "REQUIRED",
+          "priority": 0,
+          "authenticatorFlow": true,
+          "flowAlias": "heartAuth-register-form"
         },
         {
           "authenticator": "register-device-authenticator",
@@ -42,26 +43,47 @@
           "authenticatorFlow": false
         }
       ]
+    },
+    {
+      "alias": "heartAuth-register-form",
+      "description": "Standard registration steps (form-flow)",
+      "providerId": "form-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        { "authenticator": "registration-user-creation",   "requirement": "REQUIRED", "priority": 0, "authenticatorFlow": false },
+        { "authenticator": "registration-password-action", "requirement": "REQUIRED", "priority": 1, "authenticatorFlow": false }
+      ]
     }
   ],
-
   "clients": [
     {
-      "clientId": "test-app",
+      "clientId": "APP-ID",
       "publicClient": true,
-      "redirectUris": ["http://localhost:8081/*"],
-      "webOrigins": ["*"]
+      "redirectUris": [
+        "http://localhost:8081/*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
     }
   ],
-
   "users": [
     {
-      "username": "poziomk3",
+      "username": "Nervarien",
       "enabled": true,
+      "email": "nervarien@example.com",
       "emailVerified": true,
+      "firstName": "Jan",
+      "lastName": "Nowak",
       "credentials": [
-        { "type": "password", "value": "poziomk3", "temporary": false }
-      ]
+        {
+          "type": "password",
+          "value": "Nervarien",
+          "temporary": false
+        }
+      ],
+      "requiredActions": []
     }
   ]
 }

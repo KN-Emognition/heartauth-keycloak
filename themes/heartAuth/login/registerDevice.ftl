@@ -7,7 +7,6 @@
         <div style="display:flex;justify-content:center;margin:1rem 0;">
             <img alt="QR" src="${qr}" width="280" height="280" style="border-radius:8px"/>
         </div>
-
         <form action="${url.loginAction}" method="post">
             <input type="hidden" name="session" value="${sessionId}">
             <div class="pf-c-form__actions">

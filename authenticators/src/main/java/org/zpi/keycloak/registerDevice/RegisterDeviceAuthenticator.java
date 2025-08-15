@@ -47,54 +47,46 @@ public class RegisterDeviceAuthenticator implements Authenticator {
 
     @Override
     public void action(AuthenticationFlowContext ctx) {
-        try {
-            var form = ctx.getHttpRequest().getDecodedFormParameters();
-            LOG.infof("action(): params=%s user=%s",
-                    form, ctx.getUser() != null ? ctx.getUser().getUsername() : "null");
+        var form = ctx.getHttpRequest().getDecodedFormParameters();
+        LOG.infof("action(): params=%s user=%s",
+                form, ctx.getUser() != null ? ctx.getUser().getUsername() : "null");
 
-            if (form.containsKey("cancel")) {
-                LOG.info("action(): user canceled");
-                ctx.failure(AuthenticationFlowError.ACCESS_DENIED);
-                return;
-            }
-
-            String authSessionId = form.getFirst("session");
-            // action(): missing session id
-            if (authSessionId == null || authSessionId.isBlank()) {
-                LOG.warn("action(): missing session id in form");
-                ctx.failureChallenge(
-                        AuthenticationFlowError.INVALID_CLIENT_SESSION,
-                        ctx.form()
-                                .setError("Missing session information.")
-                                .createErrorPage(Status.BAD_REQUEST)
-                );
-                return;
-            }
-
-
-            boolean approved = checkOutOfBandApproval(authSessionId, ctx);
-            LOG.infof("action(): approved=%s", approved);
-
-            if (approved) {
-                UserModel user = resolveUserFromApproval(authSessionId, ctx);
-                LOG.infof("action(): resolved user=%s", user != null ? user.getUsername() : "null");
-                if (user != null) ctx.setUser(user);
-                ctx.success();
-                return;
-            }
-
-            LOG.info("action(): not approved yet -> re-render authenticate()");
-            authenticate(ctx);
-        } catch (Exception e) {
-            LOG.error("action(): unexpected error", e);
-            ctx.failureChallenge(
-                    AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form()
-                            .setError("Unexpected error while rendering QR page.")
-                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)   // <-- pass Status here
-            );
+        // 1) Cancel -> fail
+        if (form.containsKey("cancel")) {
+            LOG.info("action(): user canceled");
+            ctx.failure(AuthenticationFlowError.ACCESS_DENIED);
+            return;
         }
+
+        // 2) User clicked "I scanned it" -> succeed immediately
+        if ("1".equals(form.getFirst("confirm"))) {
+            LOG.info("QR step confirmed by user -> success()");
+            ctx.success();
+            return;                                // <— important
+        }
+
+        // 3) (Optional) OOB approval path if you keep it
+        String authSessionId = form.getFirst("session");
+        if (authSessionId == null || authSessionId.isBlank()) {
+            LOG.warn("action(): missing session id in form");
+            ctx.failure(AuthenticationFlowError.INVALID_CLIENT_SESSION);
+            return;
+        }
+
+        boolean approved = checkOutOfBandApproval(authSessionId, ctx);
+        LOG.infof("action(): approved=%s", approved);
+        if (approved) {
+            UserModel user = resolveUserFromApproval(authSessionId, ctx);
+            if (user != null) ctx.setUser(user);
+            ctx.success();
+            return;
+        }
+
+        // 4) Not approved -> re-render
+        LOG.info("action(): not approved yet -> re-render authenticate()");
+        authenticate(ctx);
     }
+
 
     private boolean checkOutOfBandApproval(String authSessionId, AuthenticationFlowContext ctx) {
         LOG.debugf("checkOutOfBandApproval(): %s", authSessionId);
