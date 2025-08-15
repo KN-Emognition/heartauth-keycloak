@@ -28,7 +28,7 @@ services:
       start-dev --http-enabled=true --http-port=8080 --import-realm
     ports: ["8080:8080"]
     volumes:
-      - ./providers:/opt/keycloak/providers
+      - ./authenticators/target:/opt/keycloak/providers
       - ./themes:/opt/keycloak/themes
       - ./realms:/opt/keycloak/data/import
 volumes:

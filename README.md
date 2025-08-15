@@ -8,3 +8,8 @@ KEYCLOAK_ADMIN=admin
 KEYCLOAK_ADMIN_PASSWORD=admin
 
 ```
+
+test link for login
+```
+http://localhost:8080/realms/HeartAuth Showcase/protocol/openid-connect/auth?client_id=APP-ID&response_type=code&redirect_uri=http://localhost:8081/&scope=openid&prompt=login&max_age=0
+```
