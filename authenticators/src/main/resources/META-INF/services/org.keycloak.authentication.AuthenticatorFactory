@@ -1,1 +1,1 @@
-org.zpi.keycloak.registerDevice.DeviceEnrollAuthenticatorFactory
+org.zpi.keycloak.registerDevice.RegisterDeviceAuthenticatorFactory

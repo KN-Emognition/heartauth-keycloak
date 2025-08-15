@@ -3,7 +3,7 @@
   "enabled": true,
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
-
+  "loginTheme": "heartAuth",
   "browserFlow": "ecg-browser",
 
   "authenticationFlows": [
@@ -36,7 +36,7 @@
           "authenticatorFlow": false
         },
         {
-          "authenticator": "device-enroll-authenticator",
+          "authenticator": "register-device-authenticator",
           "requirement": "REQUIRED",
           "priority": 1,
           "authenticatorFlow": false

@@ -11,8 +11,8 @@ import org.keycloak.provider.ProviderConfigProperty;
 import java.util.Collections;
 import java.util.List;
 
-public class DeviceEnrollAuthenticatorFactory implements AuthenticatorFactory {
-    public static final String ID = "device-enroll-authenticator";
+public class RegisterDeviceAuthenticatorFactory implements AuthenticatorFactory {
+    public static final String ID = "register-device-authenticator";
 
     @Override
     public String getId() {
@@ -21,7 +21,7 @@ public class DeviceEnrollAuthenticatorFactory implements AuthenticatorFactory {
 
     @Override
     public String getReferenceCategory() {
-        return "device-enroll";
+        return "register-device";
     }
 
     @Override
@@ -37,7 +37,7 @@ public class DeviceEnrollAuthenticatorFactory implements AuthenticatorFactory {
 
     @Override
     public Authenticator create(KeycloakSession session) {
-        return new DeviceEnrollAuthenticator();
+        return new RegisterDeviceAuthenticator();
     }
 
     @Override

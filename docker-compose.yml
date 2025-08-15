@@ -27,6 +27,7 @@ services:
     ports: ["8080:8080"]
     volumes:
       - ./providers:/opt/keycloak/providers
+      - ./themes:/opt/keycloak/themes
       - ./realms:/opt/keycloak/data/import
 volumes:
   kcpg:
