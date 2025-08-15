@@ -41,6 +41,12 @@
           "requirement": "REQUIRED",
           "priority": 1,
           "authenticatorFlow": false
+        },
+        {
+          "authenticator": "auth-spnego",
+          "requirement": "REQUIRED",
+          "priority": 2,
+          "authenticatorFlow": false
         }
       ]
     },
