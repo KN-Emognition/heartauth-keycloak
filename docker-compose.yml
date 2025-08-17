@@ -1,14 +1,37 @@
-version: "3.9"
+#  docker compose down -v && docker compose up
 services:
-  service:
-    build:
-      context: .
-      args:
-        KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-        KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-        KEYCLOAK_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI}
-    ports:
-      - "8080:8080"
+  postgres:
+    image: postgres:16
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes: [kcpg:/var/lib/postgresql/data]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.2
+    depends_on: [postgres]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT: false
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_SPI_IMPORT__SINGLE_FILE__STRATEGY: OVERWRITE_EXISTING
+      KC_SPI_IMPORT__DIR__STRATEGY: OVERWRITE_EXISTING
+      KC_LOG_LEVEL: "info,org.zpi.keycloak.registerDevice:debug"
+#      QUARKUS_LOG_CATEGORY__org.keycloak.authentication__LEVEL: DEBUG
+#      QUARKUS_LOG_CATEGORY__org.zpi.keycloak.registerDevice__LEVEL: DEBUG
+      # optional: force realm login theme if you don't want to set it in the UI
+    command: >
+      start-dev --http-enabled=true --http-port=8080 --import-realm
+    ports: ["8080:8080"]
+    volumes:
+      - ./authenticators/target:/opt/keycloak/providers
+      - ./themes:/opt/keycloak/themes
+      - ./realms:/opt/keycloak/data/import
+volumes:
+  kcpg:

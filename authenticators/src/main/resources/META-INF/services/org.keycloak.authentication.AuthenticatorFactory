@@ -1,0 +1,2 @@
+org.zpi.keycloak.registerDevice.RegisterDeviceAuthenticatorFactory
+org.zpi.keycloak.ecg.EcgAuthenticatorFactory

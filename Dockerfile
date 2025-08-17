@@ -1,26 +1,39 @@
-# on machine do 
-# chmod +x keycloak/entrypoint.sh
-FROM alpine:3.19 as generator
+# docker build -t keycloak-iam .
+# ---- Stage 1: Build custom authenticators ----
+# ---- Stage 1: build authenticators (unchanged) ----
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+WORKDIR /src
+COPY authenticators/ ./authenticators/
+RUN mvn -B -q -DskipTests -f authenticators/pom.xml dependency:go-offline
+ARG SKIP_OPENAPI=false
+ARG ORCH_SPEC=/src/authenticators/api/orc/orchestrator.yml
+RUN if [ "$SKIP_OPENAPI" = "true" ]; then \
+      mvn -B -q -DskipTests -Dskip.openapi=true -f authenticators/pom.xml package ; \
+    else \
+      mvn -B -q -DskipTests -Dorchestrator.spec=${ORCH_SPEC} -f authenticators/pom.xml package ; \
+    fi
 
-RUN apk add --no-cache gettext
+# ---- Stage 1b: static jq ----
+FROM ghcr.io/jqlang/jq:1.7 AS jqstage
+# static binary lives at /jq in this image
 
-WORKDIR /app
-COPY keycloak/realm-config/myrealm-realm.json.template .
-COPY keycloak/generate-realm.sh .
+# ---- Stage 2: Keycloak ----
+FROM quay.io/keycloak/keycloak:24.0.2
 
-ARG KEYCLOAK_REALM
-ARG KEYCLOAK_CLIENT_ID
-ARG KEYCLOAK_REDIRECT_URI
+# Providers
+COPY --chown=1000:0 --from=build /src/authenticators/target/*.jar /opt/keycloak/providers/
 
-ENV KEYCLOAK_REALM=${KEYCLOAK_REALM}
-ENV KEYCLOAK_CLIENT_ID=${KEYCLOAK_CLIENT_ID}
-ENV KEYCLOAK_REDIRECT_URI=${KEYCLOAK_REDIRECT_URI}
+# ✅ copy static jq and make sure it's executable & on PATH
+COPY --from=jqstage /jq /usr/local/bin/jq
+ENV PATH="/usr/local/bin:${PATH}"
 
-RUN chmod +x generate-realm.sh && \
-    ./generate-realm.sh
+# Themes + realm template + entrypoint
+COPY --chown=1000:0 themes/ /opt/keycloak/themes/
+COPY --chown=1000:0 realms/realm-template.json /opt/keycloak/realm-template.json
+COPY --chown=1000:0 --chmod=0755 docker/entrypoint.sh /opt/keycloak/entrypoint.sh
 
-FROM quay.io/keycloak/keycloak:24.0.3
+# Index providers
+RUN /opt/keycloak/bin/kc.sh build
 
-COPY --from=generator /app/myrealm-realm.json /opt/keycloak/data/import/myrealm-realm.json
-
-ENTRYPOINT ["/opt/keycloak/bin/kc.sh", "start-dev", "--import-realm"]
+USER 1000
+ENTRYPOINT ["/opt/keycloak/entrypoint.sh"]
