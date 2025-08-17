@@ -1,31 +1,58 @@
 package org.zpi.keycloak.registerDevice;
 
-import jakarta.ws.rs.core.Response;           // keep
-import jakarta.ws.rs.core.Response.Status;     // <-- add this
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
+import org.keycloak.crypto.*;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 
+import org.zpi.orchestrator.invoker.ApiClient;
+import org.zpi.orchestrator.api.PairingApi;
+import org.zpi.orchestrator.model.PairingStatusResponse;
+
+import java.util.Base64;
+import java.util.UUID;
+
 public class RegisterDeviceAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(RegisterDeviceAuthenticator.class);
+
+    private static final String AUTH_NOTE_JTI = "ecg.pair.jti";
+    private PairingApi pairingApi;
+    private String pairingApiBase;
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
         try {
+            getPairingApi(ctx);
             String authSessionId = ctx.getAuthenticationSession().getParentSession().getId();
+
             LOG.infof("authenticate(): realm=%s client=%s user=%s sessionId=%s",
                     ctx.getRealm().getName(),
                     ctx.getAuthenticationSession().getClient().getClientId(),
                     ctx.getUser() != null ? ctx.getUser().getUsername() : "null",
                     authSessionId);
 
-            String payload = "login:" + authSessionId;
-            byte[] png = QrUtils.pngFor(payload, 300);
-            String dataUri = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png);
+            String jti = UUID.randomUUID().toString();
+            ctx.getAuthenticationSession().setAuthNote(AUTH_NOTE_JTI, jti);
+
+            String pairingJwt = JwtUtils.mintPairingJwt(
+                    ctx.getSession(),
+                    ctx.getRealm(),
+                    jti,
+                    "ecg-mobile-app",
+                    ctx.getUser() != null ? ctx.getUser().getId() : null,
+                    RegisterDeviceConfig.from(ctx).tokenTtl()
+            );
+            LOG.infof("JWT in QR: %s",pairingJwt);
+
+            byte[] png = QrUtils.pngFor(pairingJwt, 300);
+
+            String dataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(png);
 
             Response challenge = ctx.form()
                     .setAttribute("qr", dataUri)
@@ -39,10 +66,9 @@ public class RegisterDeviceAuthenticator implements Authenticator {
                     AuthenticationFlowError.INTERNAL_ERROR,
                     ctx.form()
                             .setError("Unexpected error while rendering QR page.")
-                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)   // <-- pass Status
+                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
-
     }
 
     @Override
@@ -51,21 +77,16 @@ public class RegisterDeviceAuthenticator implements Authenticator {
         LOG.infof("action(): params=%s user=%s",
                 form, ctx.getUser() != null ? ctx.getUser().getUsername() : "null");
 
-        // 1) Cancel -> fail
         if (form.containsKey("cancel")) {
             LOG.info("action(): user canceled");
             ctx.failure(AuthenticationFlowError.ACCESS_DENIED);
             return;
         }
-
-        // 2) User clicked "I scanned it" -> succeed immediately
         if ("1".equals(form.getFirst("confirm"))) {
             LOG.info("QR step confirmed by user -> success()");
             ctx.success();
-            return;                                // <— important
+            return;
         }
-
-        // 3) (Optional) OOB approval path if you keep it
         String authSessionId = form.getFirst("session");
         if (authSessionId == null || authSessionId.isBlank()) {
             LOG.warn("action(): missing session id in form");
@@ -73,33 +94,62 @@ public class RegisterDeviceAuthenticator implements Authenticator {
             return;
         }
 
-        boolean approved = checkOutOfBandApproval(authSessionId, ctx);
-        LOG.infof("action(): approved=%s", approved);
-        if (approved) {
-            UserModel user = resolveUserFromApproval(authSessionId, ctx);
-            if (user != null) ctx.setUser(user);
+        UUID jti = UUID.fromString(ctx.getAuthenticationSession().getAuthNote(AUTH_NOTE_JTI));
+        if (jti.toString().isBlank()) {
+            LOG.warn("action(): missing jti in auth notes");
+            ctx.failure(AuthenticationFlowError.INTERNAL_ERROR);
+            return;
+        }
+
+        boolean linked = checkPairingLinked(ctx, jti, authSessionId);
+        LOG.infof("action(): pairing linked=%s (jti=%s)", linked, jti);
+        if (linked) {
             ctx.success();
             return;
         }
 
-        // 4) Not approved -> re-render
         LOG.info("action(): not approved yet -> re-render authenticate()");
         authenticate(ctx);
     }
 
 
-    private boolean checkOutOfBandApproval(String authSessionId, AuthenticationFlowContext ctx) {
-        LOG.debugf("checkOutOfBandApproval(): %s", authSessionId);
+    private PairingApi getPairingApi(AuthenticationFlowContext ctx) {
+        RegisterDeviceConfig cfg = RegisterDeviceConfig.from(ctx);
+        if (pairingApi == null || pairingApiBase == null || !pairingApiBase.equals(cfg.orchBaseUrl())) {
+            ApiClient client = new ApiClient();
+            client.setBasePath(cfg.orchBaseUrl());
+            pairingApi = new PairingApi(client);
+            pairingApiBase = cfg.orchBaseUrl();
+        }
+        return pairingApi;
+    }
+
+    private boolean checkPairingLinked(AuthenticationFlowContext ctx, UUID jti, String authSessionId) {
+        try {
+            PairingStatusResponse res = getPairingApi(ctx).pairStatusJtiGet(jti, authSessionId);
+            return res.getState() == PairingStatusResponse.StateEnum.LINKED;
+        } catch (Exception ex) {
+            LOG.warnf(ex, "checkPairingLinked(): orchestrator error for jti=%s", jti);
+            return false;
+        }
+    }
+
+
+    @Override
+    public boolean requiresUser() {
         return false;
     }
 
-    private UserModel resolveUserFromApproval(String authSessionId, AuthenticationFlowContext ctx) {
-        LOG.debugf("resolveUserFromApproval(): %s", authSessionId);
-        return ctx.getUser(); // or look up based on approval payload
+    @Override
+    public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) {
+        return false;
     }
 
-    @Override public boolean requiresUser() { return false; }
-    @Override public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) { return u != null && false; }
-    @Override public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) {}
-    @Override public void close() {}
+    @Override
+    public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) {
+    }
+
+    @Override
+    public void close() {
+    }
 }

@@ -3,15 +3,17 @@ package org.zpi.keycloak.registerDevice;
 import org.keycloak.Config;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
+import org.keycloak.authentication.ConfigurableAuthenticatorFactory;
 import org.keycloak.models.AuthenticationExecutionModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.provider.ProviderConfigProperty;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 
-public class RegisterDeviceAuthenticatorFactory implements AuthenticatorFactory {
+public class RegisterDeviceAuthenticatorFactory
+        implements AuthenticatorFactory, ConfigurableAuthenticatorFactory {
     public static final String ID = "register-device-authenticator";
 
     @Override
@@ -26,13 +28,30 @@ public class RegisterDeviceAuthenticatorFactory implements AuthenticatorFactory 
 
     @Override
     public boolean isConfigurable() {
-        return false;
+        return true;
     }
 
 
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return Collections.emptyList();
+        List<ProviderConfigProperty> props = new ArrayList<>();
+
+        props.add(new ProviderConfigProperty(
+                RegisterDeviceConfig.Keys.ORCH_BASE_URL,
+                "Orchestrator Base URL",
+                "Base URL of the ECG Orchestrator service.",
+                ProviderConfigProperty.STRING_TYPE,
+                "https://orchestrator.example.com"));
+
+        props.add(new ProviderConfigProperty(
+                RegisterDeviceConfig.Keys.TOKEN_TTL_SEC,
+                "Pairing Token TTL (seconds)",
+                "Validity of the pairing JWT shown in QR.",
+                ProviderConfigProperty.STRING_TYPE,
+                "300"));
+
+
+        return props;
     }
 
     @Override

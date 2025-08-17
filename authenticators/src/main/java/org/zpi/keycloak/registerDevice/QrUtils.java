@@ -1,10 +1,9 @@
 package org.zpi.keycloak.registerDevice;
 
-
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
-import com.google.zxing.qrcode.QRCodeWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -19,12 +18,15 @@ public final class QrUtils {
     public static byte[] pngFor(String text, int size) {
         try {
             Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-            hints.put(EncodeHintType.MARGIN, 1); // small quiet zone
-            BitMatrix matrix = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size, hints);
-            BufferedImage img = new BufferedImage(matrix.getWidth(), matrix.getHeight(), BufferedImage.TYPE_INT_RGB);
-            for (int x = 0; x < matrix.getWidth(); x++) {
-                for (int y = 0; y < matrix.getHeight(); y++) {
-                    img.setRGB(x, y, matrix.get(x, y) ? 0x000000 : 0xFFFFFF);
+            hints.put(EncodeHintType.MARGIN, 1);
+
+            BitMatrix m = new QRCodeWriter()
+                    .encode(text, BarcodeFormat.QR_CODE, size, size, hints);
+
+            BufferedImage img = new BufferedImage(m.getWidth(), m.getHeight(), BufferedImage.TYPE_INT_RGB);
+            for (int x = 0; x < m.getWidth(); x++) {
+                for (int y = 0; y < m.getHeight(); y++) {
+                    img.setRGB(x, y, m.get(x, y) ? 0x000000 : 0xFFFFFF);
                 }
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -35,4 +37,3 @@ public final class QrUtils {
         }
     }
 }
-
