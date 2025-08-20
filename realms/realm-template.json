@@ -1,21 +1,23 @@
 {
-  "realm": "heartauth",
-  "displayName": "HeartAuth Showcase",
+  "realm": "${KC_REALM:-heartauth}",
+  "displayName": "${KC_REALM_DISPLAY_NAME:-HeartAuth Showcase}",
   "enabled": true,
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "loginTheme": "heartAuth",
   "browserFlow": "heartAuth-browser",
   "registrationFlow": "heartAuth-register",
+
   "authenticatorConfig": [
     {
       "alias": "register-device-config",
       "config": {
-        "orchBaseUrl": "https://orchestrator.example.com",
-        "tokenTtl": "300"
+        "orchBaseUrl": "${KC_ORCH_BASE_URL:-https://orchestrator.example.com}",
+        "tokenTtl": "${KC_TOKEN_TTL:-300}"
       }
     }
   ],
+
   "authenticationFlows": [
     {
       "alias": "heartAuth-browser",
@@ -89,37 +91,37 @@
       ]
     }
   ],
+
   "clients": [
     {
-      "clientId": "APP-ID",
-      "publicClient": true,
-      "redirectUris": [
-        "*"
-      ],
-      "webOrigins": [
-        "*"
-      ],
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      }
+      "clientId": "${KC_CLIENT_ID:-APP-ID}",
+      "publicClient": "${KC_PUBLIC_CLIENT:-true}",
+    "secret": "${KC_CLIENT_SECRET:-APP-SECRET}",
+    "redirectUris": "${KC_REDIRECT_URIS_JSON:-[\"*\"]}",
+    "webOrigins": "${KC_WEB_ORIGINS_JSON:-[\"*\"]}",
+    "attributes": {
+      "pkce.code.challenge.method": "${KC_PKCE_METHOD:-S256}"
+    }
     }
   ],
+
   "browserSecurityHeaders": {
-    "xFrameOptions": "SAMEORIGIN",
-    "contentSecurityPolicy": "frame-ancestors *; frame-src 'self'; object-src 'none';"
+    "xFrameOptions": "${KC_XFRAME_OPTIONS:-SAMEORIGIN}",
+    "contentSecurityPolicy": "${KC_CSP:-frame-ancestors *; frame-src 'self'; object-src 'none';}"
   },
+
   "users": [
     {
-      "username": "Nervarien",
+      "username": "${KC_DEMO_USERNAME:-Nervarien}",
       "enabled": true,
-      "email": "nervarien@example.com",
+      "email": "${KC_DEMO_EMAIL:-nervarien@example.com}",
       "emailVerified": true,
-      "firstName": "Jan",
-      "lastName": "Nowak",
+      "firstName": "${KC_DEMO_FIRST_NAME:-Jan}",
+      "lastName": "${KC_DEMO_LAST_NAME:-Nowak}",
       "credentials": [
         {
           "type": "password",
-          "value": "Nervarien",
+          "value": "${KC_DEMO_PASSWORD:-Nervarien}",
           "temporary": false
         }
       ],
