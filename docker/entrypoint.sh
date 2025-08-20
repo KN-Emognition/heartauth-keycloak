@@ -77,20 +77,21 @@ jq --arg realm "$KC_IMPORT_REALM_NAME" \
  | .registrationFlow = $registrationFlow
  | .clients = (
      .clients
-     | map(if .clientId then .clientId = $clientId else . end)
      | map(
          if .clientId == $clientId then
            .publicClient = $publicClient
          | .redirectUris = $redirectUris
          | .webOrigins   = $webOrigins
-         | .attributes["pkce.code.challenge.method"] = $pkceMethod
          | ( if $publicClient
-             then del(.secret)                            # public client -> no secret
-                  | .standardFlowEnabled = true
-           else .secret = $clientSecret                   # confidential -> set secret
-                | .standardFlowEnabled = true
+             then del(.secret)
+             else .secret = $clientSecret
              end )
-         else . end
+         | ( if ($publicClient and ($pkceMethod|length>0))  # only set PKCE for public client with a non-empty method
+             then .attributes["pkce.code.challenge.method"] = $pkceMethod
+             else (if .attributes then del(.attributes["pkce.code.challenge.method"]) else . end)
+             end )
+         else .
+         end
        )
    )
  | .browserSecurityHeaders.xFrameOptions = $xfo
@@ -100,8 +101,9 @@ jq --arg realm "$KC_IMPORT_REALM_NAME" \
      | map(
          if .alias == "register-device-config"
            then .config.orchBaseUrl = $orchBaseUrl
-              | .config.tokenTtl    = $tokenTtl
-           else . end
+                | .config.tokenTtl    = $tokenTtl
+           else .
+           end
        )
    )
  ' /opt/keycloak/realm-template.json > "$tmp_realm"
@@ -129,10 +131,33 @@ if [[ "${KC_CREATE_DEMO_USER}" == "true" ]]; then
      ' "$tmp_realm" > "${tmp_realm}.tmp" && mv "${tmp_realm}.tmp" "$tmp_realm"
 fi
 
-# Start Keycloak with import
+HOSTNAME_ARGS=()
+if [[ -n "${KC_HOSTNAME_URL:-}" ]]; then
+  scheme="$(echo "$KC_HOSTNAME_URL" | sed -E 's#^([a-zA-Z][a-zA-Z0-9+.-]*)://.*#\1#')"
+  host="$(echo "$KC_HOSTNAME_URL"   | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://([^/:]+).*#\1#')"
+  port="$(echo "$KC_HOSTNAME_URL"   | sed -E 's#^[a-zA-Z][a-zA-Z0-9+.-]*://[^/:]+:([0-9]+).*#\1#')"
+
+  HOSTNAME_ARGS+=( --hostname="${host}" )
+
+  if [[ "$scheme" == "http" ]]; then
+    # Use provided port or default to 8080 in dev
+    HOSTNAME_ARGS+=( --http-enabled=true )
+    HOSTNAME_ARGS+=( --http-port="${port:-${KC_HTTP_PORT:-8080}}" )
+  else
+    # HTTPS in dev needs certs; if you *do* have them, uncomment & set paths:
+    # HOSTNAME_ARGS+=( --https-port="${port:-8443}" )
+    # HOSTNAME_ARGS+=( --https-certificate-file=/path/to/cert.pem )
+    # HOSTNAME_ARGS+=( --https-certificate-key-file=/path/to/key.pem )
+    echo "Warning: HTTPS hostname URL detected but no cert flags provided; prefer HTTP in dev." >&2
+  fi
+else
+  HOSTNAME_ARGS+=( --hostname="${KC_HOSTNAME:-127.0.0.1}" )
+  HOSTNAME_ARGS+=( --http-enabled=true )
+  HOSTNAME_ARGS+=( --http-port="${KC_HTTP_PORT:-8080}" )
+fi
 exec /opt/keycloak/bin/kc.sh start-dev \
-  --http-enabled=true \
-  --http-port=${KC_HTTP_PORT:-8080} \
-  --hostname-strict=${KC_HOSTNAME_STRICT:-false} \
+  --hostname-strict="${KC_HOSTNAME_STRICT:-false}" \
+  --hostname-backchannel-dynamic="${KC_HOSTNAME_BACKCHANNEL_DYNAMIC:-true}" \
   --import-realm \
-  --import-realm-override=${KC_IMPORT_REALM_OVERRIDE:-true}
+  --import-realm-override="${KC_IMPORT_REALM_OVERRIDE:-true}" \
+  "${HOSTNAME_ARGS[@]}"
