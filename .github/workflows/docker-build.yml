@@ -29,6 +29,10 @@ jobs:
       - name: Build Docker image
         run: docker build -t keycloak-iam .
 
+      - name: Get short SHA
+        id: vars
+        run: echo "short_sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Push Docker image
         if: github.ref == 'refs/heads/master'
         uses: docker/build-push-action@v6
@@ -36,5 +40,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.P3_DH_USERNAME }}/keycloak-iam:latest
-            ${{ secrets.P3_DH_USERNAME }}/keycloak-iam:${{ github.sha }}
+            ${{ secrets.P3_DH_USERNAME }}/${{ github.event.repository.name }}:latest
+            ${{ secrets.P3_DH_USERNAME }}/${{ github.event.repository.name }}:${{ steps.vars.outputs.short_sha }}
