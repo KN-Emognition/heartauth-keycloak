@@ -11,7 +11,7 @@ RUN if [ "$SKIP_OPENAPI" = "true" ]; then \
       mvn -B -q -DskipTests -Dorchestrator.spec=${ORCH_SPEC} -f authenticators/pom.xml package ; \
     fi
 FROM ghcr.io/jqlang/jq:1.7 AS jqstage
-FROM quay.io/keycloak/keycloak:24.0.2
+FROM quay.io/keycloak/keycloak:26.3
 COPY --chown=1000:0 --from=build /src/authenticators/target/*.jar /opt/keycloak/providers/
 COPY --from=jqstage /jq /usr/local/bin/jq
 ENV PATH="/usr/local/bin:${PATH}"
