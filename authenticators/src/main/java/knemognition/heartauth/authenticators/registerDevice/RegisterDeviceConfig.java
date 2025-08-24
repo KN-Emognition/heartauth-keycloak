@@ -1,4 +1,4 @@
-package org.zpi.keycloak.registerDevice;
+package knemognition.heartauth.authenticators.registerDevice;
 
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.models.AuthenticatorConfigModel;

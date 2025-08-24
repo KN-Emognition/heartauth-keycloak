@@ -36,5 +36,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ secrets.P3_DH_USERNAME }}/keycloak-iam:latest
-            ${{ secrets.P3_DH_USERNAME }}/keycloak-iam:${{ github.sha }}
+            ${{ secrets.P3_DH_USERNAME }}/$(echo ${{ github.repository }} | cut -d'/' -f2):latest
+            ${{ secrets.P3_DH_USERNAME }}/$(echo ${{ github.repository }} | cut -d'/' -f2):${{ github.sha::7 }}

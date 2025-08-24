@@ -7,7 +7,6 @@ RUN --mount=type=cache,target=/root/.m2 \
 COPY authenticators/ authenticators/
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -q -DskipTests \
-        -Dorchestrator.spec=/src/authenticators/api/orc/orchestrator.yml \
         -f authenticators/pom.xml package
 FROM quay.io/keycloak/keycloak:26.3
 COPY --chown=1000:0 --from=build /src/authenticators/target/*.jar /opt/keycloak/providers/
