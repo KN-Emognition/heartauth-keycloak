@@ -1,4 +1,4 @@
-package org.zpi.keycloak.registerDevice;
+package knemognition.heartauth.authenticators.registerDevice;
 
 import org.keycloak.common.util.Time;
 import org.keycloak.crypto.Algorithm;

@@ -1,5 +1,2 @@
-test link for login
-```
-http://localhost:8080/realms/heartauth/protocol/openid-connect/auth?client_id=APP-ID&
-response_type=code&redirect_uri=http://localhost:8081/&scope=openid&prompt=login&max_age=0
-```
+http://localhost:9000/realms/heartauth/protocol/openid-connect/auth?response_type=code&client_id=test-conf&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F&scope=openid&state=xyz
+ 

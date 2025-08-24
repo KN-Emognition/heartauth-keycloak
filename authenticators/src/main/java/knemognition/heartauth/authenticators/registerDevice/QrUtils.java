@@ -1,4 +1,4 @@
-package org.zpi.keycloak.registerDevice;
+package knemognition.heartauth.authenticators.registerDevice;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;

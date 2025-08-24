@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: ECG Orchestrator API — Shared Components
+  version: 1.0.0
+
+components:
+  parameters:
+    JtiParam:
+      name: jti
+      in: path
+      required: true
+      description: One-time pairing token ID (UUID) from the QR's JWT `jti`.
+      schema: { type: string, format: uuid }
+
+    ChallengeIdParam:
+      name: id
+      in: path
+      required: true
+      description: Challenge ID (UUID).
+      schema: { type: string, format: uuid }
+
+    DPoPHeader:
+      name: DPoP
+      in: header
+      required: false
+      schema: { type: string }
+      description: Optional DPoP proof header (JWS). If present, validate proof-of-possession.
+
+  schemas:
+    # Pairing
+    PairingInitRequest:
+      type: object
+      required: [ deviceId, displayName, publicKeyPem, fcmToken, platform ]
+      properties:
+        deviceId: { type: string, maxLength: 128, description: Stable device identifier. }
+        displayName: { type: string, maxLength: 128 }
+        publicKeyPem: { type: string , description: PEM-encoded ECDSA P-256 public key. }
+        fcmToken: { type: string, description: Firebase Cloud Messaging token. }
+        platform: { type: string, enum: [ ANDROID, IOS ] }
+        osVersion: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        attestation:
+          $ref: '#/components/schemas/Attestation'
+
+    PairingInitResponse:
+      type: object
+      required: [ jti, nonce, exp ]
+      properties:
+        jti: { type: string, format: uuid }
+        nonce: { type: string, description: Base64 random 32-byte nonce. }
+        exp: { type: integer, format: int64, description: Expiration (epoch seconds). }
+        policy:
+          type: object
+          nullable: true
+          properties:
+            deviceLimitRemaining: { type: integer, minimum: 0 }
+
+    PairingConfirmRequest:
+      type: object
+      required: [ jti, deviceId, signature, alg ]
+      properties:
+        jti: { type: string, format: uuid }
+        deviceId: { type: string }
+        signature:
+          type: string
+          description: Base64url DER ECDSA over SHA-256(nonce||jti||deviceId).
+        alg: { type: string, enum: [ ES256 ] }
+        dpop: { type: string, nullable: true }
+
+    PairingConfirmResponse:
+      type: object
+      required: [ status ]
+      properties:
+        status: { type: string, enum: [ linked ] }
+        credential: { $ref: '#/components/schemas/DeviceCredential' }
+
+    PairingStatusResponse:
+      type: object
+      required: [ state ]
+      properties:
+        state: { type: string, enum: [ pending, linked, expired, replayed, denied ] }
+        reason: { type: string, nullable: true, description: Optional reason for terminal states. }
+
+    DeviceCredential:
+      type: object
+      required: [ deviceId, displayName, publicKeyPem, fcmToken, createdAt ]
+      properties:
+        deviceId: { type: string }
+        displayName: { type: string }
+        publicKeyPem:{ type: string }
+        fcmToken: { type: string }
+        attestation: { $ref: '#/components/schemas/Attestation' }
+        createdAt: { type: integer, format: int64 }
+
+    Attestation:
+      type: object
+      properties:
+        type: { type: string, enum: [ play-integrity, safety-net, devicecheck, none ] }
+        verdict: { type: string, nullable: true }
+        payload: { type: object, nullable: true, additionalProperties: true }
+
+    ChallengeCreateRequest:
+      type: object
+      required: [ userId ]
+      properties:
+        userId: { type: string, format: uuid }
+        ttlSeconds: { type: integer, minimum: 30, maximum: 300, default: 120 }
+
+    ChallengeCreateResponse:
+      type: object
+      required: [ challengeId ]
+      properties:
+        challengeId: { type: string, format: uuid }
+
+    ChallengeCompleteRequest:
+      type: object
+      required: [ assertionJwt ]
+      properties:
+        assertionJwt:
+          type: string
+          description: |
+            JWS (ES256) signed by the device key. Claims: challengeId, nonce, aud, iat, biometricPassed, matchScore, deviceId.
+        anything:
+          type: string
+    ChallengeStatusResponse:
+      type: object
+      required: [ state ]
+      properties:
+        state:
+          $ref: '#/components/schemas/ChallengeStatus'
+        reason: { type: string, nullable: true, enum: [ low_score, user_cancelled, timeout, policy ] }
+    ChallengeStatus:
+      type: string
+      description: Lifecycle state of a challenge.
+      enum: [ PENDING, APPROVED, DENIED, EXPIRED, NOT_FOUND ]
+

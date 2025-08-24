@@ -1,4 +1,4 @@
-package org.zpi.keycloak.registerDevice;
+package knemognition.heartauth.authenticators.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
@@ -6,14 +6,12 @@ import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
 import org.keycloak.authentication.Authenticator;
-import org.keycloak.crypto.*;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 
-import org.zpi.orchestrator.invoker.ApiClient;
-import org.zpi.orchestrator.api.PairingApi;
-import org.zpi.orchestrator.model.PairingStatusResponse;
+//import org.zpi.orchestrator.invoker.ApiClient;
+//import org.zpi.orchestrator.api.PairingApi;
 
 import java.util.Base64;
 import java.util.UUID;
@@ -22,13 +20,13 @@ public class RegisterDeviceAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(RegisterDeviceAuthenticator.class);
 
     private static final String AUTH_NOTE_JTI = "ecg.pair.jti";
-    private PairingApi pairingApi;
+//    private PairingApi pairingApi;
     private String pairingApiBase;
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
         try {
-            getPairingApi(ctx);
+//            getPairingApi(ctx);
             String authSessionId = ctx.getAuthenticationSession().getParentSession().getId();
 
             LOG.infof("authenticate(): realm=%s client=%s user=%s sessionId=%s",
@@ -101,38 +99,38 @@ public class RegisterDeviceAuthenticator implements Authenticator {
             return;
         }
 
-        boolean linked = checkPairingLinked(ctx, jti, authSessionId);
-        LOG.infof("action(): pairing linked=%s (jti=%s)", linked, jti);
-        if (linked) {
-            ctx.success();
-            return;
-        }
+//        boolean linked = checkPairingLinked(ctx, jti, authSessionId);
+//        LOG.infof("action(): pairing linked=%s (jti=%s)", linked, jti);
+//        if (linked) {
+//            ctx.success();
+//            return;
+//        }
 
         LOG.info("action(): not approved yet -> re-render authenticate()");
         authenticate(ctx);
     }
 
 
-    private PairingApi getPairingApi(AuthenticationFlowContext ctx) {
-        RegisterDeviceConfig cfg = RegisterDeviceConfig.from(ctx);
-        if (pairingApi == null || pairingApiBase == null || !pairingApiBase.equals(cfg.orchBaseUrl())) {
-            ApiClient client = new ApiClient();
-            client.setBasePath(cfg.orchBaseUrl());
-            pairingApi = new PairingApi(client);
-            pairingApiBase = cfg.orchBaseUrl();
-        }
-        return pairingApi;
-    }
-
-    private boolean checkPairingLinked(AuthenticationFlowContext ctx, UUID jti, String authSessionId) {
-        try {
-            PairingStatusResponse res = getPairingApi(ctx).pairStatusJtiGet(jti, authSessionId);
-            return res.getState() == PairingStatusResponse.StateEnum.LINKED;
-        } catch (Exception ex) {
-            LOG.warnf(ex, "checkPairingLinked(): orchestrator error for jti=%s", jti);
-            return false;
-        }
-    }
+//    private PairingApi getPairingApi(AuthenticationFlowContext ctx) {
+//        RegisterDeviceConfig cfg = RegisterDeviceConfig.from(ctx);
+//        if (pairingApi == null || pairingApiBase == null || !pairingApiBase.equals(cfg.orchBaseUrl())) {
+//            ApiClient client = new ApiClient();
+//            client.setBasePath(cfg.orchBaseUrl());
+//            pairingApi = new PairingApi(client);
+//            pairingApiBase = cfg.orchBaseUrl();
+//        }
+//        return pairingApi;
+//    }
+//
+//    private boolean checkPairingLinked(AuthenticationFlowContext ctx, UUID jti, String authSessionId) {
+//        try {
+//            PairingStatusResponse res = getPairingApi(ctx).pairStatusJtiGet(jti, authSessionId);
+//            return res.getState() == PairingStatusResponse.StateEnum.LINKED;
+//        } catch (Exception ex) {
+//            LOG.warnf(ex, "checkPairingLinked(): orchestrator error for jti=%s", jti);
+//            return false;
+//        }
+//    }
 
 
     @Override

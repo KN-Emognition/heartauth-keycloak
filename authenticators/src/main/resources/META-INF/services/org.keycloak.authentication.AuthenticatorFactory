@@ -1,2 +1,2 @@
-org.zpi.keycloak.registerDevice.RegisterDeviceAuthenticatorFactory
-org.zpi.keycloak.ecg.EcgAuthenticatorFactory
+knemognition.heartauth.authenticators.registerDevice.RegisterDeviceAuthenticatorFactory
+knemognition.heartauth.authenticators.ecg.EcgAuthenticatorFactory
