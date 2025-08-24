@@ -1,10 +1,10 @@
 package knemognition.heartauth.authenticators.ecg;
 
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 import knemognition.heartauth.authenticators.shared.OrchestratorClient;
 import knemognition.heartauth.orchestrator.invoker.ApiException;
-import knemognition.heartauth.orchestrator.model.ChallengeStatusResponse;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
@@ -22,8 +22,10 @@ import static knemognition.heartauth.authenticators.ecg.EcgAuthenticatorFactory.
 public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
 
+    // Auth session note key: ties challenge to the browser tab/flow
     private static final String NOTE_CHALLENGE_ID = "ecg.challengeId";
 
+    // --- config helpers ---
     private static String cfg(Map<String, String> c, String k, String def) {
         var v = (c != null) ? c.get(k) : null;
         return (v == null || v.isBlank()) ? def : v;
@@ -41,46 +43,76 @@ public class EcgAuthenticator implements Authenticator {
         return new OrchestratorClient(base, apiKey, Duration.ofMillis(timeoutMs));
     }
 
+    /** Render the FTL page; the page will open SSE to KC and post 'finalize=1' once terminal. */
     private void render(AuthenticationFlowContext ctx, UUID challengeId) {
         Map<String, String> conf = ctx.getAuthenticatorConfig() != null ? ctx.getAuthenticatorConfig().getConfig() : Map.of();
         int pollMs = cfgInt(conf, CONF_POLL_MS, 2000);
+
+        var as = ctx.getAuthenticationSession();
+        String rootId = as.getParentSession().getId();
+        String tabId  = as.getTabId();
+
+        // Build "/realms/{realm}/ecg" from server context (don’t depend on FTL `url.*`)
+        String realmName = ctx.getRealm().getName();
+        String base = ctx.getSession().getContext().getUri().getBaseUri().toString(); // ends with "/"
+        if (!base.endsWith("/")) base = base + "/";
+        String watchBase = base + "realms/" + realmName + "/ecg";
+
         Response page = ctx.form()
                 .setAttribute("challengeId", challengeId.toString())
                 .setAttribute("pollMs", pollMs)
+                .setAttribute("rootAuthSessionId", rootId)
+                .setAttribute("tabId", tabId)
+                .setAttribute("watchBase", watchBase)
                 .createForm("ecg.ftl");
         ctx.challenge(page);
     }
 
+    /** Legacy JSON helpers kept for completeness (unused by SSE flow) */
+    private Response json(Object entity, Status status) {
+        return Response.status(status)
+                .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+                .type(MediaType.APPLICATION_JSON_TYPE)
+                .entity(entity)
+                .build();
+    }
+    @SuppressWarnings("unused")
+    private Response jsonOk(Object entity) { return json(entity, Status.OK); }
+
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
-        var ac = ctx.getAuthenticatorConfig();
-        LOG.debugf("ECG config attached? alias=%s id=%s map=%s",
-                ac != null ? ac.getAlias() : "null",
-                ac != null ? ac.getId() : "null",
-                ac != null ? ac.getConfig() : null);
 
         try {
             var sess = ctx.getAuthenticationSession();
 
-            // Reuse existing challenge if already created for this auth session
+            // Reuse existing challenge if page is re-rendered
             String existing = sess.getAuthNote(NOTE_CHALLENGE_ID);
             if (existing != null && !existing.isBlank()) {
-                UUID challengeId = UUID.fromString(existing);
-                LOG.debugf("ECG: reusing existing challengeId=%s", challengeId);
-                render(ctx, challengeId);
+                render(ctx, UUID.fromString(existing));
                 return;
             }
 
-            // First render: create challenge ONCE
+            // Create a new challenge for this user/tab
             UserModel user = ctx.getUser();
             UUID userId = UUID.fromString(user.getId());
-            Map<String, String> conf = ac != null ? ac.getConfig() : Map.of();
+
+            Map<String, String> conf = ctx.getAuthenticatorConfig() != null ? ctx.getAuthenticatorConfig().getConfig() : Map.of();
             int ttlSeconds = cfgInt(conf, CONF_TTL_SECONDS, 120);
 
             UUID challengeId = client(ctx).createChallenge(userId, ttlSeconds);
             sess.setAuthNote(NOTE_CHALLENGE_ID, challengeId.toString());
-            LOG.debugf("ECG: created challengeId=%s for user=%s", challengeId, userId);
 
+            String base = cfg(conf, EcgAuthenticatorFactory.CONF_BASE_URL, "");
+            String apiKey = cfg(conf, EcgAuthenticatorFactory.CONF_API_KEY, "");
+            int timeoutMs = cfgInt(conf, EcgAuthenticatorFactory.CONF_TIMEOUT_MS, 5000);
+            int pollMs = cfgInt(conf, EcgAuthenticatorFactory.CONF_POLL_MS, 2000);
+
+            sess.setAuthNote("ecg.baseUrl", base);
+            sess.setAuthNote("ecg.apiKey", apiKey);
+            sess.setAuthNote("ecg.timeoutMs", Integer.toString(timeoutMs));
+            sess.setAuthNote("ecg.pollMs", Integer.toString(pollMs));
+            // keep your existing:
+            sess.setAuthNote("ecg.challengeId", challengeId.toString());
             render(ctx, challengeId);
 
         } catch (ApiException e) {
@@ -96,19 +128,26 @@ public class EcgAuthenticator implements Authenticator {
 
     @Override
     public void action(AuthenticationFlowContext ctx) {
-        var params = ctx.getHttpRequest().getDecodedFormParameters();
+        var req = ctx.getHttpRequest();
+        var params = req.getDecodedFormParameters();
+
+        LOG.debugf("ECG action(): method=%s, finalize=%s, cancel=%s, url=%s",
+                req.getHttpMethod(),
+                (params != null && params.containsKey("finalize")),
+                (params != null && params.containsKey("cancel")),
+                req.getUri().getRequestUri().toString());
 
         if (params.containsKey("cancel")) {
             ctx.failure(AuthenticationFlowError.ACCESS_DENIED);
             return;
         }
 
-        // Polling path: NEVER create here, only read the stored challengeId
-        if (params.containsKey("poll")) {
+        // === New: finalize branch ===
+        // Triggered once by the page when SSE says APPROVED / DENIED / EXPIRED / NOT_FOUND
+        if (params.containsKey("finalize")) {
             String idStr = ctx.getAuthenticationSession().getAuthNote(NOTE_CHALLENGE_ID);
             if (idStr == null || idStr.isBlank()) {
-                // Do NOT create a new one here; surface a clean error or re-render without creating
-                LOG.warn("ECG: poll requested but no challengeId in session");
+                LOG.warn("ECG: finalize requested but no challengeId in session");
                 ctx.failureChallenge(AuthenticationFlowError.EXPIRED_CODE,
                         ctx.form().setError("Challenge not found").createErrorPage(Status.UNAUTHORIZED));
                 return;
@@ -116,14 +155,17 @@ public class EcgAuthenticator implements Authenticator {
 
             UUID id = UUID.fromString(idStr);
             try {
-                String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
-                ChallengeStatusResponse st = client(ctx).getStatus(id, kcSession);
+                String kcSession = ctx.getAuthenticationSession().getParentSession().getId(); // root session id
+                var st = client(ctx).getStatus(id, kcSession);
 
                 switch (st.getState()) {
-                    case APPROVED -> { ctx.success(); return; }
+                    case APPROVED -> {
+                        ctx.success();
+                        return;
+                    }
                     case DENIED -> {
                         ctx.failureChallenge(AuthenticationFlowError.INVALID_USER,
-                                ctx.form().setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
+                                ctx.form().setError("Denied" + (st.getReason()!=null?": "+st.getReason():""))
                                         .createErrorPage(Status.UNAUTHORIZED));
                         return;
                     }
@@ -132,25 +174,26 @@ public class EcgAuthenticator implements Authenticator {
                                 ctx.form().setError("Challenge expired").createErrorPage(Status.UNAUTHORIZED));
                         return;
                     }
-                    default -> { // PENDING
+                    default -> {
+                        // Still pending (race): re-render the page so SSE continues to watch.
                         render(ctx, id);
                         return;
                     }
                 }
+
             } catch (ApiException e) {
-                LOG.warnf(e, "ECG: polling failed for id=%s", id);
+                LOG.warnf(e, "ECG: finalize status fetch failed for id=%s", id);
                 ctx.failureChallenge(AuthenticationFlowError.INTERNAL_ERROR,
                         ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE));
+                return;
             }
-            return;
         }
 
-        // Any other action => just re-show the same page, DO NOT create a new challenge
+        // Any other action => re-render without creating a new challenge
         String idStr = ctx.getAuthenticationSession().getAuthNote(NOTE_CHALLENGE_ID);
         if (idStr != null && !idStr.isBlank()) {
             render(ctx, UUID.fromString(idStr));
         } else {
-            // First-time entry without poll/cancel: fall back to normal authenticate() (will create once)
             authenticate(ctx);
         }
     }
