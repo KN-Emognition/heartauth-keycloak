@@ -1,4 +1,8 @@
 {
     "title": "Register device",
-    "hint": "Scan this QR code in your HeartAuth app."
+    "hint": "Scan this QR code in your HeartAuth app.",
+    "approved": "Device linked. Finishing…",
+    "denied": "Pairing denied. Please restart.",
+    "expired": "Pairing expired. Please restart.",
+    "not_found": "Pairing not found. Please restart."
 }

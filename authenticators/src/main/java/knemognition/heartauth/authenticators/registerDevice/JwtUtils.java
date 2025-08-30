@@ -1,80 +1,47 @@
 package knemognition.heartauth.authenticators.registerDevice;
 
-import org.keycloak.common.util.Time;
-import org.keycloak.crypto.Algorithm;
-import org.keycloak.crypto.AsymmetricSignatureSignerContext;
-import org.keycloak.crypto.KeyUse;
-import org.keycloak.crypto.KeyWrapper;
-import org.keycloak.jose.jws.JWSBuilder;
-import org.keycloak.models.KeyManager;
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
-import org.keycloak.services.Urls;
-import org.keycloak.urls.UrlType;
-import org.keycloak.util.JsonSerialization;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
-import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-
-public final class JwtUtils {
+final class JwtUtils {
 
     private JwtUtils() {
     }
 
-    public static String mintJwt(KeycloakSession session,
-                                 RealmModel realm,
-                                 String alg,
-                                 Duration ttl,
-                                 Map<String, Object> custom) {
-        Objects.requireNonNull(session, "session");
-        Objects.requireNonNull(realm, "realm");
-        if (alg == null || alg.isBlank()) alg = Algorithm.RS256;
-
-        KeyManager keys = session.keys();
-        KeyWrapper key = keys.getActiveKey(realm, KeyUse.SIG, alg);
-        if (key == null) {
-            throw new IllegalStateException("No active realm signing key for alg=" + alg);
-        }
-
-        long iat = Time.currentTime();
-        long exp = iat + ttl.toSeconds();
-
-        String issuer = Urls.realmIssuer(
-                session.getContext().getUri(UrlType.FRONTEND).getBaseUri(),
-                realm.getName()
-        ).toString();
-
-        Map<String, Object> claims = new LinkedHashMap<>();
-        claims.put("iss", issuer);
-        claims.put("iat", iat);
-        claims.put("exp", exp);
-        if (custom != null) claims.putAll(custom);
-
-        try {
-            return new JWSBuilder()
-                    .kid(key.getKid())
-                    .type("JWT")
-                    .jsonContent(claims)
-                    .sign(new AsymmetricSignatureSignerContext(key));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to sign JWT", e);
-        }
+    private static String b64url(byte[] bytes) {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    public static String mintPairingJwt(KeycloakSession session,
-                                        RealmModel realm,
-                                        String jti,
-                                        String audience,
-                                        String subjectUserIdOrNull,
-                                        Duration ttl) {
-        Map<String, Object> custom = new LinkedHashMap<>();
-        custom.put("aud", audience);
-        custom.put("jti", jti);
-        if (subjectUserIdOrNull != null && !subjectUserIdOrNull.isBlank()) {
-            custom.put("sub", subjectUserIdOrNull);
-        }
-        return mintJwt(session, realm, Algorithm.RS256, ttl, custom);
+    private static byte[] hmacSha256(byte[] key, String data) throws Exception {
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec(key, "HmacSHA256"));
+        return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Creates HS256 JWT with claims: sub, aud, iat, exp, jti.
+     */
+    static String mintHs256(String secret, String sub, String aud, long iat, long exp, String jti) throws Exception {
+        if (secret == null || secret.isBlank()) throw new IllegalArgumentException("JWT secret is blank");
+
+        String headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+        // Keep it simple; values are controlled and require no escaping beyond quotes
+        String payloadJson = new StringBuilder(128)
+                .append("{")
+                .append("\"sub\":\"").append(sub).append("\",")
+                .append("\"iat\":").append(iat).append(",")
+                .append("\"aud\":\"").append(aud).append("\",")
+                .append("\"exp\":").append(exp).append(",")
+                .append("\"jti\":\"").append(jti).append("\"")
+                .append("}")
+                .toString();
+
+        String header = b64url(headerJson.getBytes(StandardCharsets.UTF_8));
+        String payload = b64url(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String signingInput = header + "." + payload;
+        String signature = b64url(hmacSha256(secret.getBytes(StandardCharsets.UTF_8), signingInput));
+        return signingInput + "." + signature;
     }
 }

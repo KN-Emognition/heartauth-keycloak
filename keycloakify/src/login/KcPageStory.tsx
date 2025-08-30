@@ -20,7 +20,10 @@ const kcContextExtensionPerPage: KcContextExtensionPerPage = {
     },
     "registerDevice.ftl": {
         qr: "qrCodeData",
-        sessionId: "sessionId123"
+        id: "pairingId123",
+        rootAuthSessionId: "rootAuthSessionId123",
+        tabId: "tabId123",
+        watchBase: "watchBase123"
     }
 };
 

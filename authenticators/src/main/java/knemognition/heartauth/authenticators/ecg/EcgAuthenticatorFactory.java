@@ -12,7 +12,7 @@ import org.keycloak.provider.ProviderConfigProperty;
 
 import java.util.List;
 
-public class EcgAuthenticatorFactory implements AuthenticatorFactory, ConfigurableAuthenticatorFactory {
+public class EcgAuthenticatorFactory implements AuthenticatorFactory {
     public static final String ID = "ecg-authenticator";
 
 
@@ -47,6 +47,7 @@ public class EcgAuthenticatorFactory implements AuthenticatorFactory, Configurab
     public List<ProviderConfigProperty> getConfigProperties() {
         return List.of();
     }
+
 
     @Override
     public Requirement[] getRequirementChoices() {
