@@ -12,6 +12,7 @@ public class EcgWatchResourceProviderFactory implements RealmResourceProviderFac
         return new EcgWatchResourceProvider(session);
     }
 
+
     @Override public void init(org.keycloak.Config.Scope config) {}
     @Override public void postInit(KeycloakSessionFactory factory) {}
     @Override public void close() {}

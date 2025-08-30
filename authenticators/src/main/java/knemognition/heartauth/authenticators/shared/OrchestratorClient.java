@@ -99,7 +99,7 @@ public class OrchestratorClient {
         try {
             ChallengeStatusResponse resp = challengeApi.internalChallengeStatus(challengeId, kcSession);
             long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-            LOG.debugf("getStatus OK: id=%s state=%s (%d ms)", challengeId, resp.getState(), tookMs);
+            LOG.debugf("getStatus OK: id=%s state=%s (%d ms)", challengeId, resp.getStatus(), tookMs);
             return resp;
         } catch (ApiException e) {
             long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);

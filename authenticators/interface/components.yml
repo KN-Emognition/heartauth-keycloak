@@ -36,7 +36,8 @@ components:
         displayName: { type: string, maxLength: 128 }
         publicKeyPem: { type: string , description: PEM-encoded ECDSA P-256 public key. }
         fcmToken: { type: string, description: Firebase Cloud Messaging token. }
-        platform: { type: string, enum: [ ANDROID, IOS ] }
+        platform:
+          $ref: '#/components/schemas/Platform'
         osVersion: { type: string, nullable: true }
         model: { type: string, nullable: true }
         attestation:
@@ -71,14 +72,16 @@ components:
       type: object
       required: [ status ]
       properties:
-        status: { type: string, enum: [ linked ] }
+        status:
+            $ref: '#/components/schemas/FlowStatus'
         credential: { $ref: '#/components/schemas/DeviceCredential' }
 
     PairingStatusResponse:
       type: object
-      required: [ state ]
+      required: [ status ]
       properties:
-        state: { type: string, enum: [ pending, linked, expired, replayed, denied ] }
+        status:
+          $ref: '#/components/schemas/FlowStatus'
         reason: { type: string, nullable: true, description: Optional reason for terminal states. }
 
     DeviceCredential:
@@ -87,7 +90,7 @@ components:
       properties:
         deviceId: { type: string }
         displayName: { type: string }
-        publicKeyPem:{ type: string }
+        publicKeyPem: { type: string }
         fcmToken: { type: string }
         attestation: { $ref: '#/components/schemas/Attestation' }
         createdAt: { type: integer, format: int64 }
@@ -124,13 +127,16 @@ components:
           type: string
     ChallengeStatusResponse:
       type: object
-      required: [ state ]
+      required: [ status ]
       properties:
-        state:
-          $ref: '#/components/schemas/ChallengeStatus'
+        status:
+          $ref: '#/components/schemas/FlowStatus'
         reason: { type: string, nullable: true, enum: [ low_score, user_cancelled, timeout, policy ] }
-    ChallengeStatus:
+    FlowStatus:
       type: string
       description: Lifecycle state of a challenge.
       enum: [ PENDING, APPROVED, DENIED, EXPIRED, NOT_FOUND ]
+    Platform:
+      type: string
+      enum: [ ANDROID, IOS ]
 

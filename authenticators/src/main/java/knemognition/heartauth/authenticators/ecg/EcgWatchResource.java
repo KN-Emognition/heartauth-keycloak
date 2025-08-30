@@ -69,10 +69,10 @@ public class EcgWatchResource {
                 try {
                     var st = clientApi.getStatus(challenge, kcSessionId);
                     err = 0;
-                    if (!safeSend(sink, sse.newEventBuilder().data("{\"state\":\"" + st.getState().name() + "\"}").build())) {
+                    if (!safeSend(sink, sse.newEventBuilder().data("{\"state\":\"" + st.getStatus() + "\"}").build())) {
                         close(sink); return;
                     }
-                    switch (st.getState()) {
+                    switch (st.getStatus()) {
                         case APPROVED, DENIED, EXPIRED, NOT_FOUND:
                             close(sink); return;
                         case PENDING:

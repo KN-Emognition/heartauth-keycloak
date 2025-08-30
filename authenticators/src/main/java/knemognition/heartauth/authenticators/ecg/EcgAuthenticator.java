@@ -12,6 +12,7 @@ import org.keycloak.authentication.Authenticator;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.time.Duration;
 import java.util.Map;
@@ -22,17 +23,19 @@ import static knemognition.heartauth.authenticators.ecg.EcgAuthenticatorFactory.
 public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
 
-    // Auth session note key: ties challenge to the browser tab/flow
     private static final String NOTE_CHALLENGE_ID = "ecg.challengeId";
 
-    // --- config helpers ---
     private static String cfg(Map<String, String> c, String k, String def) {
         var v = (c != null) ? c.get(k) : null;
         return (v == null || v.isBlank()) ? def : v;
     }
+
     private static int cfgInt(Map<String, String> c, String k, int def) {
-        try { return Integer.parseInt(cfg(c, k, Integer.toString(def))); }
-        catch (NumberFormatException e) { return def; }
+        try {
+            return Integer.parseInt(cfg(c, k, Integer.toString(def)));
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     private OrchestratorClient client(AuthenticationFlowContext ctx) {
@@ -43,16 +46,13 @@ public class EcgAuthenticator implements Authenticator {
         return new OrchestratorClient(base, apiKey, Duration.ofMillis(timeoutMs));
     }
 
-    /** Render the FTL page; the page will open SSE to KC and post 'finalize=1' once terminal. */
     private void render(AuthenticationFlowContext ctx, UUID challengeId) {
         Map<String, String> conf = ctx.getAuthenticatorConfig() != null ? ctx.getAuthenticatorConfig().getConfig() : Map.of();
         int pollMs = cfgInt(conf, CONF_POLL_MS, 2000);
 
         var as = ctx.getAuthenticationSession();
         String rootId = as.getParentSession().getId();
-        String tabId  = as.getTabId();
-
-        // Build "/realms/{realm}/ecg" from server context (don’t depend on FTL `url.*`)
+        String tabId = as.getTabId();
         String realmName = ctx.getRealm().getName();
         String base = ctx.getSession().getContext().getUri().getBaseUri().toString(); // ends with "/"
         if (!base.endsWith("/")) base = base + "/";
@@ -68,7 +68,6 @@ public class EcgAuthenticator implements Authenticator {
         ctx.challenge(page);
     }
 
-    /** Legacy JSON helpers kept for completeness (unused by SSE flow) */
     private Response json(Object entity, Status status) {
         return Response.status(status)
                 .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
@@ -76,25 +75,24 @@ public class EcgAuthenticator implements Authenticator {
                 .entity(entity)
                 .build();
     }
+
     @SuppressWarnings("unused")
-    private Response jsonOk(Object entity) { return json(entity, Status.OK); }
+    private Response jsonOk(Object entity) {
+        return json(entity, Status.OK);
+    }
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
-
         try {
-            var sess = ctx.getAuthenticationSession();
+            AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            // Reuse existing challenge if page is re-rendered
             String existing = sess.getAuthNote(NOTE_CHALLENGE_ID);
             if (existing != null && !existing.isBlank()) {
                 render(ctx, UUID.fromString(existing));
                 return;
             }
 
-            // Create a new challenge for this user/tab
-            UserModel user = ctx.getUser();
-            UUID userId = UUID.fromString(user.getId());
+            UUID userId = UUID.fromString(ctx.getUser().getId());
 
             Map<String, String> conf = ctx.getAuthenticatorConfig() != null ? ctx.getAuthenticatorConfig().getConfig() : Map.of();
             int ttlSeconds = cfgInt(conf, CONF_TTL_SECONDS, 120);
@@ -158,14 +156,14 @@ public class EcgAuthenticator implements Authenticator {
                 String kcSession = ctx.getAuthenticationSession().getParentSession().getId(); // root session id
                 var st = client(ctx).getStatus(id, kcSession);
 
-                switch (st.getState()) {
+                switch (st.getStatus()) {
                     case APPROVED -> {
                         ctx.success();
                         return;
                     }
                     case DENIED -> {
                         ctx.failureChallenge(AuthenticationFlowError.INVALID_USER,
-                                ctx.form().setError("Denied" + (st.getReason()!=null?": "+st.getReason():""))
+                                ctx.form().setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
                                         .createErrorPage(Status.UNAUTHORIZED));
                         return;
                     }
@@ -198,8 +196,21 @@ public class EcgAuthenticator implements Authenticator {
         }
     }
 
-    @Override public boolean requiresUser() { return true; }
-    @Override public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) { return true; }
-    @Override public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) { }
-    @Override public void close() { }
+    @Override
+    public boolean requiresUser() {
+        return true;
+    }
+
+    @Override
+    public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) {
+        return true;
+    }
+
+    @Override
+    public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) {
+    }
+
+    @Override
+    public void close() {
+    }
 }
