@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 package knemognition.heartauth.authenticators.shared;
 
 import knemognition.heartauth.orchestrator.api.ChallengeApi;
@@ -118,4 +116,3 @@ public class OrchestratorClient {
         return (s.length() <= MAX) ? s : s.substring(0, MAX) + "…";
     }
 }
->>>>>>> efd00af (feat: add login flow)
