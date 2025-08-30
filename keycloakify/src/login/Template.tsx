@@ -7,7 +7,6 @@ import { useSetClassName } from "keycloakify/tools/useSetClassName";
 import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
-// import hauthLogo from "./assets/hauth_logo.png";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {

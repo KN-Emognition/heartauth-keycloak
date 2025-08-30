@@ -1,4 +1,4 @@
-package knemognition.heartauth.authenticators.ecg;
+package knemognition.heartauth.authenticators.status;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
@@ -14,10 +14,8 @@ public class SseIllegalStateMapper implements ExceptionMapper<IllegalStateExcept
     public Response toResponse(IllegalStateException e) {
         String msg = e.getMessage();
         if (msg != null && msg.contains("Response has already been written")) {
-            // Treat as a clean close; browser will reconnect if it wants.
             return Response.noContent().build(); // 204
         }
-        // Let other IllegalStateExceptions propagate to the default handler
         return Response.serverError().build();
     }
 }

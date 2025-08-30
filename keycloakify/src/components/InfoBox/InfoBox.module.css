@@ -1,0 +1,12 @@
+.infoBox {
+    display: flex;
+    gap: 10px;
+    align-items: center !important;
+}
+
+.icon {
+    margin-right: 15px;
+}
+
+.hint {
+}

@@ -1,2 +1,1 @@
-knemognition.heartauth.authenticators.registerDevice.RegisterDeviceAuthenticatorFactory
 knemognition.heartauth.authenticators.ecg.EcgAuthenticatorFactory

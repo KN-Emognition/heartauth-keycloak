@@ -1,1 +1,1 @@
-knemognition.heartauth.authenticators.ecg.EcgWatchResourceProviderFactory
+knemognition.heartauth.authenticators.status.StatusWatchResourceProviderFactory

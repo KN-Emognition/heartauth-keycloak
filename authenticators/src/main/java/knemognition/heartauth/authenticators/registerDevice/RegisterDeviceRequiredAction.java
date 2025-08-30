@@ -73,13 +73,10 @@ public class RegisterDeviceRequiredAction
             );
             LOG.infof("JWT in QR: %s", pairingJwt);
 
-            byte[] png = QrUtils.pngFor(pairingJwt, 300);
-            String dataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(png);
 
             Response challenge = ctx.form()
-                    .setAttribute("qr", dataUri)
+                    .setAttribute("qr", "token")
                     .setAttribute("sessionId", authSessionId)
-                    // Reuse your page name – can be registerDevice.ftl or ecg.ftl if you prefer
                     .createForm("registerDevice.ftl");
 
             ctx.challenge(challenge);
