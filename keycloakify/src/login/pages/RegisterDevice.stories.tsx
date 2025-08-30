@@ -1,17 +1,13 @@
+// RegisterDevice.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react";
 import { createKcPageStory } from "../KcPageStory";
 
-const { KcPageStory } = createKcPageStory({ pageId: "ecg.ftl" });
+const { KcPageStory } = createKcPageStory({ pageId: "registerDevice.ftl" });
 
-const meta = {
-    title: "login/registerDevice.ftl",
-    component: KcPageStory
+export default {
+  title: "login/registerDevice.ftl", 
+  component: KcPageStory,
 } satisfies Meta<typeof KcPageStory>;
 
-export default meta;
-
-type Story = StoryObj<typeof meta>;
-
-export const Default: Story = {
-    render: () => <KcPageStory />
-};
+type Story = StoryObj<typeof KcPageStory>;
+export const Default: Story = { render: () => <KcPageStory /> };

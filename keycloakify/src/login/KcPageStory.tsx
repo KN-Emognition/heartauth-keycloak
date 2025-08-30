@@ -12,8 +12,19 @@ const kcContextExtension: KcContextExtension = {
     }
 };
 const kcContextExtensionPerPage: KcContextExtensionPerPage = {
-    "ecg.ftl": {},
-    "registerDevice.ftl": {}
+    "ecg.ftl": {
+        id: "challengeId123",
+        rootAuthSessionId: "rootAuthSessionId123",
+        tabId: "tabId123",
+        watchBase: "watchBase123"
+    },
+    "registerDevice.ftl": {
+        qr: "qrCodeData",
+        id: "pairingId123",
+        rootAuthSessionId: "rootAuthSessionId123",
+        tabId: "tabId123",
+        watchBase: "watchBase123"
+    }
 };
 
 export const { getKcContextMock } = createGetKcContextMock({

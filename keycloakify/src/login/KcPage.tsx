@@ -4,8 +4,8 @@ import type { KcContext } from "./KcContext";
 import { useI18n } from "./i18n";
 import DefaultPage from "keycloakify/login/DefaultPage";
 import Template from "./Template";
-import LoginEcg from "./pages/LoginEcg";
-import RegisterDevice from "./pages/RegisterDevice";
+import RegisterDevice from "./pages/registerDevice/RegisterDevice";
+import LoginEcg from "./pages/ecg/Ecg";
 
 const UserProfileFormFields = lazy(
     () => import("keycloakify/login/UserProfileFormFields")
@@ -25,9 +25,7 @@ export default function KcPage(props: { kcContext: KcContext }) {
                     case "ecg.ftl":
                         return (
                             <LoginEcg
-                                kcContext={
-                                    kcContext as Extract<KcContext, { pageId: "ecg.ftl" }>
-                                }
+                                kcContext={kcContext}
                                 i18n={i18n}
                                 classes={classes}
                                 Template={Template}

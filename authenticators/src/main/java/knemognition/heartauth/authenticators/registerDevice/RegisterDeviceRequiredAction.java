@@ -2,6 +2,7 @@ package knemognition.heartauth.authenticators.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
+import knemognition.heartauth.authenticators.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -13,6 +14,7 @@ import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.UserModel;
 import org.keycloak.provider.ServerInfoAwareProviderFactory;
 
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -25,9 +27,20 @@ public class RegisterDeviceRequiredAction
     public static final String ID = "register-device";
     private static final String AUTH_NOTE_JTI = "ecg.pair.jti";
 
-    @Override public String getId() { return ID; }
-    @Override public String getDisplayText() { return "Register device"; }
-    @Override public RequiredActionProvider create(KeycloakSession session) { return this; }
+    @Override
+    public String getId() {
+        return ID;
+    }
+
+    @Override
+    public String getDisplayText() {
+        return "Register device";
+    }
+
+    @Override
+    public RequiredActionProvider create(KeycloakSession session) {
+        return this;
+    }
 
     @Override
     public void init(Config.Scope scope) {
@@ -39,7 +52,9 @@ public class RegisterDeviceRequiredAction
 
     }
 
-    @Override public void close() {}
+    @Override
+    public void close() {
+    }
 
     // Optional: expose empty config in Admin Console
 
@@ -54,46 +69,80 @@ public class RegisterDeviceRequiredAction
         }
     }
 
-    /** Initial page render (your QR screen). */
+    private static String attr(org.keycloak.models.RealmModel realm, String key, String def) {
+        String v = realm.getAttribute(key);
+        return (v == null || v.isBlank()) ? def : v;
+    }
+
+    private static long attrLong(org.keycloak.models.RealmModel realm, String key, long def) {
+        try {
+            String v = realm.getAttribute(key);
+            return (v == null || v.isBlank()) ? def : Long.parseLong(v);
+        } catch (Exception e) {
+            return def;
+        }
+    }
+
     @Override
     public void requiredActionChallenge(RequiredActionContext ctx) {
         try {
-            String authSessionId = ctx.getAuthenticationSession().getParentSession().getId();
+            var realm = ctx.getRealm();
+            var user = ctx.getUser();
 
-            String jti = UUID.randomUUID().toString();
+            // JWT inputs (from realm attributes with sane defaults)
+            String secret = attr(realm, "pairing.jwt-secret", null);
+            if (secret == null) throw new IllegalArgumentException("pairing.jwt-secret missing");
+            String aud = attr(realm, "pairing.aud", "ecg-mobile-app");
+            long ttl = attrLong(realm, "pairing.ttl-seconds", 300L);
+
+            // Pairing token fields
+            String jti = UUID.randomUUID().toString(); // we'll also use this as our "pairing id"
             ctx.getAuthenticationSession().setAuthNote(AUTH_NOTE_JTI, jti);
 
-            String pairingJwt = JwtUtils.mintPairingJwt(
-                    ctx.getSession(),
-                    ctx.getRealm(),
-                    jti,
-                    "ecg-mobile-app",
-                    ctx.getUser() != null ? ctx.getUser().getId() : null,
-                    RegisterDeviceConfig.from((AuthenticationFlowContext) ctx).tokenTtl()
-            );
-            LOG.infof("JWT in QR: %s", pairingJwt);
+            long iat = Instant.now().getEpochSecond();
+            long exp = iat + ttl;
 
-            byte[] png = QrUtils.pngFor(pairingJwt, 300);
-            String dataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(png);
+            String jwt = JwtUtils.mintHs256(secret, user.getId(), aud, iat, exp, jti);
+            LOG.infof(jwt);
+            // Build SSE base URL for pairing status:
+            String watchBase = ctx.getSession().getContext().getUri()
+                    .getBaseUriBuilder()
+                    .path("realms")
+                    .path(realm.getName())
+                    .path(StatusWatchResourceProviderFactory.ID) // "status-watch"
+                    .path("watch")
+                    .path("pairing")
+                    .build()
+                    .toString();
+
+            var as = ctx.getAuthenticationSession();
+            String rootAuthSessionId = as.getParentSession().getId();
+            String tabId = as.getTabId();
 
             Response challenge = ctx.form()
-                    .setAttribute("qr", dataUri)
-                    .setAttribute("sessionId", authSessionId)
-                    // Reuse your page name – can be registerDevice.ftl or ecg.ftl if you prefer
+                    .setAttribute("qr", jwt)                       // QR shows JWT
+                    .setAttribute("id", jti)                       // <- pairing id for SSE
+                    .setAttribute("rootAuthSessionId", rootAuthSessionId)
+                    .setAttribute("tabId", tabId)
+                    .setAttribute("watchBase", watchBase)
                     .createForm("registerDevice.ftl");
 
             ctx.challenge(challenge);
-        } catch (Exception e) {
-            LOG.error("requiredActionChallenge(): failed to render QR page", e);
+        } catch (IllegalArgumentException iae) {
+            LOG.error("RegisterDevice: missing/invalid realm attributes for JWT", iae);
             ctx.challenge(
-                    ctx.form()
-                            .setError("Unexpected error while rendering QR page.")
+                    ctx.form().setError("Pairing is not configured. Missing secret.")
+                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
+            );
+        } catch (Exception e) {
+            LOG.error("RegisterDevice: failed to render QR", e);
+            ctx.challenge(
+                    ctx.form().setError("Unexpected error while rendering QR.")
                             .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
     }
 
-    /** Handles the form POST from your page. */
     @Override
     public void processAction(RequiredActionContext ctx) {
         var form = ctx.getHttpRequest().getDecodedFormParameters();
@@ -101,14 +150,13 @@ public class RegisterDeviceRequiredAction
 
         if (form.containsKey("cancel")) {
             LOG.info("processAction(): user canceled");
-            ctx.getUser().removeRequiredAction(ID); // optional
+            ctx.getUser().removeRequiredAction(ID);
             ctx.ignore();
             return;
         }
 
         if ("1".equals(form.getFirst("confirm"))) {
             LOG.info("processAction(): confirmed by user");
-            // You may mark the device as registered here, e.g., set a user attribute/credential
             markDeviceRegistered(ctx.getUser());
             ctx.success();
             return;
@@ -138,16 +186,13 @@ public class RegisterDeviceRequiredAction
         requiredActionChallenge(ctx);
     }
 
-    /* ==== helpers – replace with your storage/logic ==== */
 
     private boolean isDeviceRegistered(UserModel user) {
-        // Example: check a user attribute/credential that you set after success
         return "true".equals(user.getFirstAttribute("hauthDeviceRegistered"));
     }
 
     private void markDeviceRegistered(UserModel user) {
         user.setSingleAttribute("hauthDeviceRegistered", "true");
-        // or create a custom credential type if you want something stronger
     }
 
     @Override

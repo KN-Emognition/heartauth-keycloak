@@ -1,11 +1,13 @@
 package knemognition.heartauth.authenticators.shared;
 
 import knemognition.heartauth.orchestrator.api.ChallengeApi;
+import knemognition.heartauth.orchestrator.api.PairingApi;
 import knemognition.heartauth.orchestrator.invoker.ApiClient;
 import knemognition.heartauth.orchestrator.invoker.ApiException;
 import knemognition.heartauth.orchestrator.model.ChallengeCreateRequest;
-import knemognition.heartauth.orchestrator.model.ChallengeCreateResponse;
 import knemognition.heartauth.orchestrator.model.ChallengeStatusResponse;
+import knemognition.heartauth.orchestrator.model.PairingStatusResponse;
+
 import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -13,106 +15,82 @@ import org.jboss.logging.Logger;
 
 import java.net.Proxy;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-public class OrchestratorClient {
+public final class OrchestratorClient {
     private static final Logger LOG = Logger.getLogger(OrchestratorClient.class);
+
+    private final ApiClient apiClient;       // shared
     private final ChallengeApi challengeApi;
+    private final PairingApi pairingApi;
 
     public OrchestratorClient(String baseUrl, String apiKey, Duration timeout) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("baseUrl is null or blank");
+        }
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalArgumentException("apiKey is null or blank");
+        }
+        Objects.requireNonNull(timeout, "timeout");
+
         OkHttpClient.Builder ok = new OkHttpClient.Builder()
                 .proxy(Proxy.NO_PROXY)
                 .connectTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
                 .readTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS)
                 .writeTimeout(timeout.toMillis(), TimeUnit.MILLISECONDS);
 
-        // Add X-Api-Key header (never log the value)
-        if (apiKey != null && !apiKey.isBlank()) {
-            Interceptor addApiKey = chain -> {
-                Request r = chain.request().newBuilder()
-                        .header("X-Api-Key", apiKey)
-                        .build();
-                return chain.proceed(r);
-            };
-            ok.addInterceptor(addApiKey);
-        }
-
-        // Correlation ID + timing/logging interceptor
-        Interceptor logging = chain -> {
-            String rid = UUID.randomUUID().toString();
-            Request req = chain.request().newBuilder()
-                    .header("X-Request-Id", rid)
+        Interceptor addApiKey = chain -> {
+            Request r = chain.request().newBuilder()
+                    .header("X-Api-Key", apiKey)
                     .build();
-
-            long startNs = System.nanoTime();
-            try {
-                okhttp3.Response resp = chain.proceed(req);
-                long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
-                // Do not log headers/body to avoid secrets; log essentials only.
-                LOG.debugf("HTTP %s %s -> %d (%d ms) rid=%s",
-                        req.method(), req.url(), resp.code(), tookMs, rid);
-                return resp;
-            } catch (Exception ex) {
-                long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
-                LOG.warnf(ex, "HTTP %s %s FAILED after %d ms rid=%s",
-                        req.method(), req.url(), tookMs, rid);
-                throw ex;
-            }
+            return chain.proceed(r);
         };
-        ok.addInterceptor(logging);
+        Interceptor addRequestId = chain -> {
+            Request r = chain.request().newBuilder()
+                    .header("X-Request-Id", UUID.randomUUID().toString())
+                    .build();
+            return chain.proceed(r);
+        };
+        ok.addInterceptor(addApiKey);
+        ok.addInterceptor(addRequestId);
 
-        ApiClient apiClient = new ApiClient();
-        apiClient.setBasePath(baseUrl);
-        apiClient.setHttpClient(ok.build());
+        this.apiClient = new ApiClient();
+        this.apiClient.setBasePath(baseUrl);
+        this.apiClient.setHttpClient(ok.build());
 
         this.challengeApi = new ChallengeApi(apiClient);
+        this.pairingApi = new PairingApi(apiClient);
 
-        LOG.debugf("OrchestratorClient init: baseUrl=%s timeout=%s apiKeyPresent=%s",
-                baseUrl, timeout, (apiKey != null && !apiKey.isBlank()));
+    }
+
+    public ChallengeApi challenge() {
+        return challengeApi;
+    }
+
+    public PairingApi pairing() {
+        return pairingApi;
+    }
+
+    public ApiClient apiClient() {
+        return apiClient;
     }
 
     public UUID createChallenge(UUID userId, Integer ttlSeconds) throws ApiException {
         var req = new ChallengeCreateRequest();
         req.setUserId(userId);
         if (ttlSeconds != null) req.setTtlSeconds(ttlSeconds);
-
-        long t0 = System.nanoTime();
-        LOG.infof("createChallenge -> userId=%s ttlSeconds=%s", userId, ttlSeconds);
-        try {
-            ChallengeCreateResponse resp = challengeApi.internalChallengeCreate(req);
-            long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-            LOG.infof("createChallenge OK: id=%s (%d ms)", resp.getChallengeId(), tookMs);
-            return resp.getChallengeId();
-        } catch (ApiException e) {
-            long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-            // ApiException typically carries HTTP status and body from upstream.
-            LOG.warnf(e, "createChallenge FAILED: status=%s body=%s (%d ms)",
-                    e.getCode(), truncate(e.getResponseBody()), tookMs);
-            throw e;
-        }
+        return challengeApi.internalChallengeCreate(req).getChallengeId();
     }
 
-    public ChallengeStatusResponse getStatus(UUID challengeId, String kcSession) throws ApiException {
-        long t0 = System.nanoTime();
-        LOG.debugf("getStatus -> id=%s kcSession=%s", challengeId, kcSession);
-        try {
-            ChallengeStatusResponse resp = challengeApi.internalChallengeStatus(challengeId, kcSession);
-            long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-            LOG.debugf("getStatus OK: id=%s state=%s (%d ms)", challengeId, resp.getStatus(), tookMs);
-            return resp;
-        } catch (ApiException e) {
-            long tookMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
-            LOG.warnf(e, "getStatus FAILED: id=%s status=%s body=%s (%d ms)",
-                    challengeId, e.getCode(), truncate(e.getResponseBody()), tookMs);
-            throw e;
-        }
+    public ChallengeStatusResponse getChallengeStatus(UUID challengeId, String kcSession) throws ApiException {
+        return challengeApi.internalChallengeStatus(challengeId, kcSession);
     }
 
-    // Avoid dumping huge/error bodies into logs
-    private static String truncate(String s) {
-        if (s == null) return null;
-        final int MAX = 512;
-        return (s.length() <= MAX) ? s : s.substring(0, MAX) + "…";
+
+    public PairingStatusResponse getPairingStatus(UUID pairingId, String kcSession) throws ApiException {
+        return pairingApi.internalPairingStatus(pairingId, kcSession);
     }
+
 }
