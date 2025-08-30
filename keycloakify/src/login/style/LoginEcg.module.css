@@ -1,0 +1,42 @@
+
+.ecgPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.ecgLogo {
+  display: block;
+  margin: 4px auto 8px;
+  width: 180px;
+  max-width: 70%;
+}
+
+.ecgStatus {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.ecgDebug {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+.ecgActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.ecgLinkRestart { text-decoration: underline; }
+
+/* WAŻNE: to są klasy globalne PatternFly – musisz użyć :global(...) */
+:global(.pf-c-alert) {
+  width: 100%;
+  /* border-radius: 8px; */
+}
