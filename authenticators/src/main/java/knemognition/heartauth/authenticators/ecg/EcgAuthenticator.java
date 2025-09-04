@@ -15,48 +15,26 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
-import java.time.Duration;
-import java.util.Map;
 import java.util.UUID;
+
+import static knemognition.heartauth.authenticators.shared.OrchestratorClient.client;
 
 public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
 
-    private static final String NOTE_CHALLENGE_ID = "ecg.challengeId";
+    private static final String CHALLENGE_ID = "ecg.challengeId";
 
-    // ---------- realm helpers (realm-only config) ----------
-    private static String rAttr(RealmModel realm, String key, String def) {
-        String v = realm.getAttribute(key);
-        return (v == null || v.isBlank()) ? def : v;
-    }
 
-    private static int rAttrInt(RealmModel realm, String key, int def) {
-        try {
-            String v = realm.getAttribute(key);
-            return (v == null || v.isBlank()) ? def : Integer.parseInt(v);
-        } catch (Exception e) {
-            return def;
-        }
-    }
-
-    private OrchestratorClient client(AuthenticationFlowContext ctx) {
-        RealmModel realm = ctx.getRealm();
-        String baseUrl = rAttr(realm, "status.base-url", "");
-        String apiKey = rAttr(realm, "status.api-key", "");
-        int timeoutMs = rAttrInt(realm, "status.timeout-ms", 5000);
-        return new OrchestratorClient(baseUrl, apiKey, Duration.ofMillis(timeoutMs));
-    }
-
-    private void render(AuthenticationFlowContext ctx, UUID challengeId) {
+    private void render(AuthenticationFlowContext ctx) {
         var as = ctx.getAuthenticationSession();
 
         String watchBase = ctx.getSession().getContext().getUri()
                 .getBaseUriBuilder().path("realms").path(ctx.getRealm().getName())
-                .path(StatusWatchResourceProviderFactory.ID)                // "status-watch"
+                .path(StatusWatchResourceProviderFactory.ID)
                 .path("watch").path("ecg")
                 .build().toString();
         Response page = ctx.form()
-                .setAttribute("id", challengeId.toString())
+                .setAttribute("id", CHALLENGE_ID)
                 .setAttribute("rootAuthSessionId", as.getParentSession().getId())
                 .setAttribute("tabId", as.getTabId())
                 .setAttribute("watchBase", watchBase)
@@ -65,34 +43,26 @@ public class EcgAuthenticator implements Authenticator {
         ctx.challenge(page);
     }
 
-    private Response json(Object entity, Status status) {
-        return Response.status(status)
-                .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-                .type(MediaType.APPLICATION_JSON_TYPE)
-                .entity(entity)
-                .build();
-    }
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
         try {
             AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            String existing = sess.getAuthNote(NOTE_CHALLENGE_ID);
+            String existing = sess.getAuthNote(CHALLENGE_ID);
             if (existing != null && !existing.isBlank()) {
-                render(ctx, UUID.fromString(existing));
+                render(ctx);
                 return;
             }
 
+            OrchestratorClient client = client(ctx.getRealm());
             UUID userId = UUID.fromString(ctx.getUser().getId());
-            // TTL from realm (fallback 120s)
-            int ttlSeconds = rAttrInt(ctx.getRealm(), "status.ttl-seconds", 120);
 
-            UUID challengeId = client(ctx).createChallenge(userId, ttlSeconds);
-            sess.setAuthNote(NOTE_CHALLENGE_ID, challengeId.toString());
+            UUID challengeId = client.createChallenge(userId, 120);
 
-            // We no longer set ecg.* notes; realm attributes are the single source of truth.
-            render(ctx, challengeId);
+            sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
+
+            render(ctx);
 
         } catch (ApiException e) {
             LOG.warn("ECG: orchestrator call failed", e);
@@ -122,7 +92,7 @@ public class EcgAuthenticator implements Authenticator {
         }
 
         if (params.containsKey("finalize")) {
-            String idStr = ctx.getAuthenticationSession().getAuthNote(NOTE_CHALLENGE_ID);
+            String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
             if (idStr == null || idStr.isBlank()) {
                 ctx.failureChallenge(AuthenticationFlowError.EXPIRED_CODE,
                         ctx.form().setError("Challenge not found").createErrorPage(Status.UNAUTHORIZED));
@@ -132,7 +102,7 @@ public class EcgAuthenticator implements Authenticator {
             UUID id = UUID.fromString(idStr);
             try {
                 String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
-                var st = client(ctx).getChallengeStatus(id, kcSession);
+                var st = client(ctx.getRealm()).getChallengeStatus(id, kcSession);
 
                 switch (st.getStatus()) {
                     case APPROVED -> {
@@ -155,7 +125,7 @@ public class EcgAuthenticator implements Authenticator {
                         return;
                     }
                     default -> {
-                        render(ctx, id);
+                        render(ctx);
                         return;
                     }
                 }
@@ -168,9 +138,9 @@ public class EcgAuthenticator implements Authenticator {
             }
         }
 
-        String idStr = ctx.getAuthenticationSession().getAuthNote(NOTE_CHALLENGE_ID);
+        String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
         if (idStr != null && !idStr.isBlank()) {
-            render(ctx, UUID.fromString(idStr));
+            render(ctx);
         } else {
             authenticate(ctx);
         }

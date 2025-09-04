@@ -2,7 +2,9 @@ package knemognition.heartauth.authenticators.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
+import knemognition.heartauth.authenticators.shared.OrchestratorClient;
 import knemognition.heartauth.authenticators.status.StatusWatchResourceProviderFactory;
+import knemognition.heartauth.orchestrator.model.PairingCreateResponse;
 import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -11,13 +13,15 @@ import org.keycloak.authentication.RequiredActionFactory;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.provider.ServerInfoAwareProviderFactory;
+import org.keycloak.sessions.AuthenticationSessionModel;
 
-import java.time.Instant;
-import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
+
+import static knemognition.heartauth.authenticators.shared.OrchestratorClient.client;
 
 public class RegisterDeviceRequiredAction
         implements RequiredActionProvider, RequiredActionFactory, ServerInfoAwareProviderFactory {
@@ -25,7 +29,8 @@ public class RegisterDeviceRequiredAction
     private static final Logger LOG = Logger.getLogger(RegisterDeviceRequiredAction.class);
 
     public static final String ID = "register-device";
-    private static final String AUTH_NOTE_JTI = "ecg.pair.jti";
+    private static final String JTI = "ecg.pair.jti";
+    private static final String JWT = "ecg.pair.jwt";
 
     @Override
     public String getId() {
@@ -42,23 +47,17 @@ public class RegisterDeviceRequiredAction
         return this;
     }
 
-    @Override
     public void init(Config.Scope scope) {
-
     }
 
     @Override
     public void postInit(KeycloakSessionFactory keycloakSessionFactory) {
-
     }
 
     @Override
     public void close() {
     }
 
-    // Optional: expose empty config in Admin Console
-
-    /** Decide when to force this action for the user (only if no device yet). */
     @Override
     public void evaluateTriggers(RequiredActionContext ctx) {
         UserModel user = ctx.getUser();
@@ -69,65 +68,50 @@ public class RegisterDeviceRequiredAction
         }
     }
 
-    private static String attr(org.keycloak.models.RealmModel realm, String key, String def) {
-        String v = realm.getAttribute(key);
-        return (v == null || v.isBlank()) ? def : v;
+    private void render(RequiredActionContext ctx) {
+        var as = ctx.getAuthenticationSession();
+        String watchBase = ctx.getSession().getContext().getUri()
+                .getBaseUriBuilder()
+                .path("realms")
+                .path(ctx.getRealm().getName())
+                .path(StatusWatchResourceProviderFactory.ID)
+                .path("watch")
+                .path("pairing")
+                .build()
+                .toString();
+
+        Response challenge = ctx.form()
+                .setAttribute("qr", RegisterDeviceRequiredAction.JTI)
+                .setAttribute("id", RegisterDeviceRequiredAction.JWT)
+                .setAttribute("rootAuthSessionId", as.getParentSession().getId())
+                .setAttribute("tabId", as.getTabId())
+                .setAttribute("watchBase", watchBase)
+                .createForm("registerDevice.ftl");
+
+        ctx.challenge(challenge);
     }
 
-    private static long attrLong(org.keycloak.models.RealmModel realm, String key, long def) {
-        try {
-            String v = realm.getAttribute(key);
-            return (v == null || v.isBlank()) ? def : Long.parseLong(v);
-        } catch (Exception e) {
-            return def;
-        }
-    }
 
     @Override
     public void requiredActionChallenge(RequiredActionContext ctx) {
         try {
-            var realm = ctx.getRealm();
-            var user = ctx.getUser();
+            AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            // JWT inputs (from realm attributes with sane defaults)
-            String secret = attr(realm, "pairing.jwt-secret", null);
-            if (secret == null) throw new IllegalArgumentException("pairing.jwt-secret missing");
-            String aud = attr(realm, "pairing.aud", "ecg-mobile-app");
-            long ttl = attrLong(realm, "pairing.ttl-seconds", 300L);
 
-            // Pairing token fields
-            String jti = UUID.randomUUID().toString(); // we'll also use this as our "pairing id"
-            ctx.getAuthenticationSession().setAuthNote(AUTH_NOTE_JTI, jti);
+            String existing = sess.getAuthNote(JTI);
+            if (existing != null && !existing.isBlank()) {
+                render(ctx);
+                return;
+            }
 
-            long iat = Instant.now().getEpochSecond();
-            long exp = iat + ttl;
+            OrchestratorClient client = client(ctx.getRealm());
+            UUID userId = UUID.fromString(ctx.getUser().getId());
+            PairingCreateResponse res = client.createPairing(userId);
+            sess.setAuthNote(JTI, res.getJti().toString());
+            sess.setAuthNote(JWT, res.getJwt());
 
-            String jwt = JwtUtils.mintHs256(secret, user.getId(), aud, iat, exp, jti);
-            LOG.infof(jwt);
-            // Build SSE base URL for pairing status:
-            String watchBase = ctx.getSession().getContext().getUri()
-                    .getBaseUriBuilder()
-                    .path("realms")
-                    .path(realm.getName())
-                    .path(StatusWatchResourceProviderFactory.ID) // "status-watch"
-                    .path("watch")
-                    .path("pairing")
-                    .build()
-                    .toString();
+            render(ctx);
 
-            var as = ctx.getAuthenticationSession();
-            String rootAuthSessionId = as.getParentSession().getId();
-            String tabId = as.getTabId();
-
-            Response challenge = ctx.form()
-                    .setAttribute("qr", jwt)                       // QR shows JWT
-                    .setAttribute("id", jti)                       // <- pairing id for SSE
-                    .setAttribute("rootAuthSessionId", rootAuthSessionId)
-                    .setAttribute("tabId", tabId)
-                    .setAttribute("watchBase", watchBase)
-                    .createForm("registerDevice.ftl");
-
-            ctx.challenge(challenge);
         } catch (IllegalArgumentException iae) {
             LOG.error("RegisterDevice: missing/invalid realm attributes for JWT", iae);
             ctx.challenge(
@@ -147,22 +131,18 @@ public class RegisterDeviceRequiredAction
     public void processAction(RequiredActionContext ctx) {
         var form = ctx.getHttpRequest().getDecodedFormParameters();
         LOG.infof("processAction(): params=%s user=%s", form, ctx.getUser() != null ? ctx.getUser().getUsername() : "null");
-
         if (form.containsKey("cancel")) {
             LOG.info("processAction(): user canceled");
             ctx.getUser().removeRequiredAction(ID);
             ctx.ignore();
             return;
         }
-
         if ("1".equals(form.getFirst("confirm"))) {
             LOG.info("processAction(): confirmed by user");
             markDeviceRegistered(ctx.getUser());
             ctx.success();
             return;
         }
-
-        // Polling path (SSE/JS checks pairing state):
         String authSessionId = form.getFirst("session");
         if (authSessionId == null || authSessionId.isBlank()) {
             LOG.warn("processAction(): missing session id in form");
@@ -171,8 +151,7 @@ public class RegisterDeviceRequiredAction
             );
             return;
         }
-
-        String jti = ctx.getAuthenticationSession().getAuthNote(AUTH_NOTE_JTI);
+        String jti = ctx.getAuthenticationSession().getAuthNote(JTI);
         if (jti == null || jti.isBlank()) {
             LOG.warn("processAction(): missing jti in auth notes");
             ctx.challenge(
@@ -180,8 +159,6 @@ public class RegisterDeviceRequiredAction
             );
             return;
         }
-
-        // If not yet linked, just show the page again (keeps the RA step active)
         LOG.info("processAction(): not approved yet -> re-render");
         requiredActionChallenge(ctx);
     }
