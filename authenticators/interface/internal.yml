@@ -14,7 +14,8 @@ paths:
   /internal/v1/pair/status/{jti}:
     get:
       operationId: internalPairingStatus
-      tags: [ Pairing ]
+      tags:
+        - Pairing
       summary: Poll current pairing status.
       description: |
         Keycloak Required Action (or app-side page) checks if the device has been linked.
@@ -24,7 +25,8 @@ paths:
         - in: header
           name: X-KC-Session
           required: false
-          schema: { type: string }
+          schema:
+            type: string
           description: Optional binding to Keycloak `authSessionId`.
       responses:
         '200':
@@ -32,16 +34,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './components.yml#/components/schemas/PairingStatusResponse'
-              examples:
-                pending: { value: { state: pending } }
-                linked:  { value: { state: linked } }
-                expired: { value: { state: expired } }
-
+                $ref: './components.yml#/components/schemas/StatusResponse'
   /internal/v1/challenge:
     post:
       operationId: internalChallengeCreate
-      tags: [ Challenge ]
+      tags:
+        - Challenge
       summary: Create a login-time ECG challenge and deliver FCM push.
       description: |
         Called by the Keycloak Authenticator. Creates a short-lived challenge, selects a target
@@ -52,12 +50,6 @@ paths:
           application/json:
             schema:
               $ref: './components.yml#/components/schemas/ChallengeCreateRequest'
-            examples:
-              create:
-                value:
-                  userId: "1a2b3c-user"
-                  deviceId: "android:3f24a1c2"
-                  ttlSeconds: 120
       responses:
         '201':
           description: Challenge created and push dispatched.
@@ -65,18 +57,11 @@ paths:
             application/json:
               schema:
                 $ref: './components.yml#/components/schemas/ChallengeCreateResponse'
-              examples:
-                ok:
-                  value:
-                    challengeId: "79f1a833-2a0c-4af9-9d8a-8ff8121c98b2"
-                    deviceId: "android:3f24a1c2"
-                    nonce: "vxxP3w5F0Z4J9eN9oVY2BA=="
-                    exp: 1723712460
-
   /internal/v1/challenge/{id}/status:
     get:
       operationId: internalChallengeStatus
-      tags: [ Challenge ]
+      tags:
+        - Challenge
       summary: Poll challenge status.
       description: |
         Used by the Keycloak login page to display live progress. Can be open if `id` is unguessable;
@@ -86,7 +71,8 @@ paths:
         - in: header
           name: X-KC-Session
           required: false
-          schema: { type: string }
+          schema:
+            type: string
           description: Optional binding to Keycloak `authSessionId`.
       responses:
         '200':
@@ -94,9 +80,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: './components.yml#/components/schemas/ChallengeStatusResponse'
-              examples:
-                pending:  { value: { state: pending } }
-                approved: { value: { state: approved } }
-                denied:   { value: { state: denied, reason: user_cancelled } }
-                expired:  { value: { state: expired } }
+                $ref: './components.yml#/components/schemas/StatusResponse'
+  /internal/v1/pair:
+    post:
+      operationId: internalPairingCreate
+      tags:
+        - Pairing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './components.yml#/components/schemas/PairingCreateRequest'
+      responses:
+        '201':
+          description: Pairing token minted
+          content:
+            application/json:
+              schema:
+                $ref: './components.yml#/components/schemas/PairingCreateResponse'

@@ -2,122 +2,130 @@ openapi: 3.0.3
 info:
   title: ECG Orchestrator API — Shared Components
   version: 1.0.0
-
 components:
   parameters:
     JtiParam:
       name: jti
       in: path
       required: true
-      description: One-time pairing token ID (UUID) from the QR's JWT `jti`.
-      schema: { type: string, format: uuid }
-
+      schema:
+        type: string
+        format: uuid
     ChallengeIdParam:
       name: id
       in: path
       required: true
-      description: Challenge ID (UUID).
-      schema: { type: string, format: uuid }
-
-    DPoPHeader:
-      name: DPoP
-      in: header
-      required: false
-      schema: { type: string }
-      description: Optional DPoP proof header (JWS). If present, validate proof-of-possession.
-
+      schema:
+        type: string
+        format: uuid
   schemas:
-    # Pairing
     PairingInitRequest:
       type: object
-      required: [ deviceId, displayName, publicKeyPem, fcmToken, platform ]
+      required:
+        - deviceId
+        - displayName
+        - publicKeyPem
+        - fcmToken
+        - platform
       properties:
-        deviceId: { type: string, maxLength: 128, description: Stable device identifier. }
-        displayName: { type: string, maxLength: 128 }
-        publicKeyPem: { type: string , description: PEM-encoded ECDSA P-256 public key. }
-        fcmToken: { type: string, description: Firebase Cloud Messaging token. }
+        deviceId:
+          type: string
+        displayName:
+          type: string
+        publicKeyPem:
+          type: string
+        fcmToken:
+          type: string
         platform:
           $ref: '#/components/schemas/Platform'
-        osVersion: { type: string, nullable: true }
-        model: { type: string, nullable: true }
+        osVersion:
+          type: string
+        model:
+          type: string
         attestation:
           $ref: '#/components/schemas/Attestation'
-
     PairingInitResponse:
       type: object
-      required: [ jti, nonce, exp ]
+      required:
+        - nonce
       properties:
-        jti: { type: string, format: uuid }
-        nonce: { type: string, description: Base64 random 32-byte nonce. }
-        exp: { type: integer, format: int64, description: Expiration (epoch seconds). }
-        policy:
-          type: object
-          nullable: true
-          properties:
-            deviceLimitRemaining: { type: integer, minimum: 0 }
-
+        nonce:
+          type: string
     PairingConfirmRequest:
       type: object
-      required: [ jti, deviceId, signature, alg ]
+      required:
+        - deviceId
+        - signature
+        - alg
       properties:
-        jti: { type: string, format: uuid }
-        deviceId: { type: string }
+        deviceId:
+          type: string
         signature:
           type: string
-          description: Base64url DER ECDSA over SHA-256(nonce||jti||deviceId).
-        alg: { type: string, enum: [ ES256 ] }
-        dpop: { type: string, nullable: true }
-
-    PairingConfirmResponse:
+        alg:
+          $ref: '#/components/schemas/EncryptionAlgo'
+    DeviceInfo:
       type: object
-      required: [ status ]
+      required:
+        - deviceId
+        - displayName
+        - publicKeyPem
+        - fcmToken
+        - createdAt
       properties:
-        status:
-            $ref: '#/components/schemas/FlowStatus'
-        credential: { $ref: '#/components/schemas/DeviceCredential' }
-
-    PairingStatusResponse:
-      type: object
-      required: [ status ]
-      properties:
-        status:
-          $ref: '#/components/schemas/FlowStatus'
-        reason: { type: string, nullable: true, description: Optional reason for terminal states. }
-
-    DeviceCredential:
-      type: object
-      required: [ deviceId, displayName, publicKeyPem, fcmToken, createdAt ]
-      properties:
-        deviceId: { type: string }
-        displayName: { type: string }
-        publicKeyPem: { type: string }
-        fcmToken: { type: string }
-        attestation: { $ref: '#/components/schemas/Attestation' }
-        createdAt: { type: integer, format: int64 }
-
+        deviceId:
+          type: string
+        displayName:
+          type: string
+        publicKeyPem:
+          type: string
+        fcmToken:
+          type: string
+        attestation:
+          $ref: '#/components/schemas/Attestation'
+        createdAt:
+          type: integer
+          format: int64
     Attestation:
       type: object
       properties:
-        type: { type: string, enum: [ play-integrity, safety-net, devicecheck, none ] }
-        verdict: { type: string, nullable: true }
-        payload: { type: object, nullable: true, additionalProperties: true }
-
+        type:
+          type: string
+          enum:
+            - play-integrity
+            - safety-net
+            - devicecheck
+            - none
+        verdict:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
     ChallengeCreateRequest:
       type: object
-      required: [ userId ]
+      required:
+        - userId
       properties:
-        userId: { type: string, format: uuid }
-        ttlSeconds: { type: integer, minimum: 30, maximum: 300, default: 120 }
-
+        userId:
+          type: string
+          format: uuid
+        ttlSeconds:
+          type: integer
+          minimum: 30
+          maximum: 300
+          default: 120
     ChallengeCreateResponse:
       type: object
-      required: [ challengeId ]
+      required:
+        - challengeId
       properties:
-        challengeId: { type: string, format: uuid }
-
+        challengeId:
+          type: string
+          format: uuid
     ChallengeCompleteRequest:
       type: object
-      required: [ assertionJwt ]
+      required:
+        - assertionJwt
       properties:
         assertionJwt:
           type: string
@@ -125,18 +133,51 @@ components:
             JWS (ES256) signed by the device key. Claims: challengeId, nonce, aud, iat, biometricPassed, matchScore, deviceId.
         anything:
           type: string
-    ChallengeStatusResponse:
+    PairingCreateRequest:
       type: object
-      required: [ status ]
+      required:
+        - userId
+      properties:
+        userId:
+          type: string
+          format: uuid
+    PairingCreateResponse:
+      type: object
+      required:
+        - jti
+        - jwt
+      properties:
+        jti:
+          type: string
+          format: uuid
+        jwt:
+          type: string
+    StatusResponse:
+      type: object
+      required:
+        - status
       properties:
         status:
           $ref: '#/components/schemas/FlowStatus'
-        reason: { type: string, nullable: true, enum: [ low_score, user_cancelled, timeout, policy ] }
+        reason:
+          type: string
     FlowStatus:
       type: string
       description: Lifecycle state of a challenge.
-      enum: [ PENDING, APPROVED, DENIED, EXPIRED, NOT_FOUND ]
+      enum:
+        - CREATED
+        - PENDING
+        - APPROVED
+        - DENIED
+        - EXPIRED
+        - NOT_FOUND
     Platform:
       type: string
-      enum: [ ANDROID, IOS ]
+      enum:
+        - ANDROID
+        - IOS
+    EncryptionAlgo:
+      type: string
+      enum:
+        - ES256
 

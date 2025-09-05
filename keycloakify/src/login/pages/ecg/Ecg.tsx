@@ -7,7 +7,15 @@ import InfoBox from "../../../components/InfoBox/InfoBox";
 import styles from "./Ecg.module.css";
 import { KcContext } from "../../KcContext";
 import useStatus from "../../../hooks/useStatus";
+
 type Props = PageProps<Extract<KcContext, { pageId: "ecg.ftl" }>, I18n>;
+
+const TERMINAL: readonly FlowStatus[] = [
+    "APPROVED",
+    "DENIED",
+    "EXPIRED",
+    "NOT_FOUND"
+] as const;
 
 export default function LoginEcg(props: Props) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
@@ -15,13 +23,17 @@ export default function LoginEcg(props: Props) {
     const { url, id, rootAuthSessionId, tabId, watchBase } = kcContext;
 
     const [status, setStatus] = useState<FlowStatus>("PENDING");
+    const isTerminal = TERMINAL.includes(status);
 
     const finalizeFormRef = useRef<HTMLFormElement>(null);
+    const submittedRef = useRef(false);
+
     useEffect(() => {
-        if (status === "APPROVED") {
+        if (isTerminal && !submittedRef.current) {
+            submittedRef.current = true;
             finalizeFormRef.current?.submit();
         }
-    }, [status]);
+    }, [isTerminal]);
 
     useStatus({
         setStatus,
@@ -30,14 +42,18 @@ export default function LoginEcg(props: Props) {
         tabId,
         watchBase
     });
+
     const hint = useMemo(() => {
         switch (status) {
             case "APPROVED":
                 return "Continuing your sign-in…";
             case "DENIED":
-                return "Request was denied. You can restart the login.";
+                return "Request was denied. Finishing up…";
+            case "EXPIRED":
             case "NOT_FOUND":
-                return "Request expired. This approval is no longer valid. Please restart.";
+                return "Request is no longer valid. Finishing up…";
+            case "CREATED":
+            case "PENDING":
             default:
                 return "Approve the request in your HeartAuth app. We’ll continue automatically.";
         }
@@ -57,8 +73,6 @@ export default function LoginEcg(props: Props) {
         }
     }, [status]);
 
-    const showRestart = status !== "PENDING" && status !== "APPROVED";
-
     return (
         <Template
             kcContext={kcContext}
@@ -66,50 +80,18 @@ export default function LoginEcg(props: Props) {
             doUseDefaultCss={doUseDefaultCss}
             classes={classes}
             displayInfo={false}
-            headerNode={
-                <h1 className={kcClsx("kcFormHeaderClass")}>Ecg Authentication</h1>
-            }
+            headerNode={<h1 className={kcClsx("kcFormHeaderClass")}>ECG Authentication</h1>}
         >
             <div className={styles.ecgPanel}>
                 <InfoBox hint={hint} type={alertType} />
                 <InfoBox hint={`Challenge ID: ${id}`} type="warning" />
-                {showRestart && (
-                    <>
-                        {url.loginRestartFlowUrl ? (
-                            <a
-                                className={kcClsx(
-                                    "kcButtonClass",
-                                    "kcButtonPrimaryClass"
-                                )}
-                                href={url.loginRestartFlowUrl}
-                            >
-                                Restart login
-                            </a>
-                        ) : (
-                            <form method="post" action={url.loginAction}>
-                                <input type="hidden" name="cancel" value="1" />
-                                <button
-                                    className={kcClsx(
-                                        "kcButtonClass",
-                                        "kcButtonPrimaryClass"
-                                    )}
-                                    type="submit"
-                                >
-                                    Restart login
-                                </button>
-                            </form>
-                        )}
-                    </>
-                )}
             </div>
             <form
                 ref={finalizeFormRef}
                 method="post"
                 action={url.loginAction}
                 style={{ display: "none" }}
-            >
-                <input type="hidden" name="finalize" value="1" />
-            </form>
+            />
         </Template>
     );
 }
