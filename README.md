@@ -1,2 +1,3 @@
-http://localhost:9000/realms/heartauth/protocol/openid-connect/auth?response_type=code&client_id=test-conf&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F&scope=openid&state=xyz
- 
+# Keycloak IAM with Custom Authenticators and Theme for Heartauth
+
+This repository contains custom authenticators and a Keycloak theme designed for Heartauth, an identity and access management solution. The project is structured to facilitate easy integration and deployment of these components within a Keycloak server.

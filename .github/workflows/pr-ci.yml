@@ -1,0 +1,49 @@
+name: PR CI (Keycloak IAM)
+
+on:
+  pull_request:
+    branches: [ master ]  
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pr-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Build authenticators (Maven/Java 17) ---
+      - name: Set up Java 17 (Temurin) with Maven cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Prime Maven deps (authenticators)
+        run: mvn -B -q -DskipTests -f authenticators/pom.xml dependency:go-offline
+
+      # Optional: run tests
+      # - name: Test (authenticators)
+      #   run: mvn -B -ntp -f authenticators/pom.xml test
+
+      - name: Package (authenticators)
+        run: mvn -B -ntp -DskipTests -f authenticators/pom.xml package
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: keycloakify/package-lock.json
+
+      - name: Install deps (theme)
+        working-directory: keycloakify
+        run: npm ci
+
+      - name: Build Keycloak theme
+        working-directory: keycloakify
+        run: npm run build-keycloak-theme
+
