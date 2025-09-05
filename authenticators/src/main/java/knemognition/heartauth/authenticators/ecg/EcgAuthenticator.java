@@ -1,6 +1,5 @@
 package knemognition.heartauth.authenticators.ecg;
 
-import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 import knemognition.heartauth.authenticators.shared.OrchestratorClient;
@@ -15,6 +14,7 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
+import java.net.URI;
 import java.util.UUID;
 
 import static knemognition.heartauth.authenticators.shared.OrchestratorClient.client;
@@ -23,26 +23,37 @@ public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
 
     private static final String CHALLENGE_ID = "ecg.challengeId";
-
+    private static final int DEFAULT_TTL_SECONDS = 120;
 
     private void render(AuthenticationFlowContext ctx) {
-        var as = ctx.getAuthenticationSession();
-
-        String watchBase = ctx.getSession().getContext().getUri()
-                .getBaseUriBuilder().path("realms").path(ctx.getRealm().getName())
+        AuthenticationSessionModel as = ctx.getAuthenticationSession();
+        String idStr = as.getAuthNote(CHALLENGE_ID);
+        URI watchBase = ctx.getSession().getContext().getUri()
+                .getBaseUriBuilder()
+                .path("realms")
+                .path(ctx.getRealm().getName())
                 .path(StatusWatchResourceProviderFactory.ID)
-                .path("watch").path("ecg")
-                .build().toString();
+                .path("watch")
+                .path("ecg")
+                .build();
+
         Response page = ctx.form()
-                .setAttribute("id", CHALLENGE_ID)
+                .setAttribute("id", idStr)
                 .setAttribute("rootAuthSessionId", as.getParentSession().getId())
                 .setAttribute("tabId", as.getTabId())
-                .setAttribute("watchBase", watchBase)
+                .setAttribute("watchBase", watchBase.toString())
                 .createForm("ecg.ftl");
 
         ctx.challenge(page);
     }
 
+    private static UUID parseUserId(UserModel user) {
+        return UUID.fromString(user.getId());
+    }
+
+    private static void clearNotes(AuthenticationSessionModel s) {
+        s.removeAuthNote(CHALLENGE_ID);
+    }
 
     @Override
     public void authenticate(AuthenticationFlowContext ctx) {
@@ -55,112 +66,85 @@ public class EcgAuthenticator implements Authenticator {
                 return;
             }
 
-            OrchestratorClient client = client(ctx.getRealm());
-            UUID userId = UUID.fromString(ctx.getUser().getId());
+            OrchestratorClient oc = client(ctx.getRealm());
+            UUID userId = parseUserId(ctx.getUser());
 
-            UUID challengeId = client.createChallenge(userId, 120);
-
+            UUID challengeId = oc.createChallenge(userId, DEFAULT_TTL_SECONDS);
             sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
 
             render(ctx);
 
         } catch (ApiException e) {
-            LOG.warn("ECG: orchestrator call failed", e);
+            LOG.warn("ECG orchestrator call failed", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Upstream unavailable")
-                            .createErrorPage(Status.SERVICE_UNAVAILABLE)
+                    ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
-            LOG.error("ECG: unexpected", e);
+            LOG.error("ECG unexpected error", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Unexpected error")
-                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                    ctx.form().setError("Unexpected error").createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
     }
 
     @Override
     public void action(AuthenticationFlowContext ctx) {
-        var req = ctx.getHttpRequest();
-        var params = req.getDecodedFormParameters();
-
-        if (params.containsKey("cancel")) {
-            ctx.failure(AuthenticationFlowError.ACCESS_DENIED);
+        String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
+        if (idStr == null || idStr.isBlank()) {
+            ctx.failureChallenge(
+                    AuthenticationFlowError.EXPIRED_CODE,
+                    ctx.form().setError("Challenge not found").createErrorPage(Status.UNAUTHORIZED)
+            );
             return;
         }
 
-        if (params.containsKey("finalize")) {
-            String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
-            if (idStr == null || idStr.isBlank()) {
-                ctx.failureChallenge(AuthenticationFlowError.EXPIRED_CODE,
-                        ctx.form().setError("Challenge not found").createErrorPage(Status.UNAUTHORIZED));
-                return;
-            }
+        UUID id = UUID.fromString(idStr);
+        try {
+            String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
+            var st = client(ctx.getRealm()).getChallengeStatus(id, kcSession);
 
-            UUID id = UUID.fromString(idStr);
-            try {
-                String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
-                var st = client(ctx.getRealm()).getChallengeStatus(id, kcSession);
-
-                switch (st.getStatus()) {
-                    case APPROVED -> {
-                        ctx.success();
-                        return;
-                    }
-                    case DENIED -> {
-                        ctx.failureChallenge(
-                                AuthenticationFlowError.INVALID_USER,
-                                ctx.form().setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
-                                        .createErrorPage(Status.UNAUTHORIZED)
-                        );
-                        return;
-                    }
-                    case EXPIRED, NOT_FOUND -> {
-                        ctx.failureChallenge(
-                                AuthenticationFlowError.EXPIRED_CODE,
-                                ctx.form().setError("Challenge expired").createErrorPage(Status.UNAUTHORIZED)
-                        );
-                        return;
-                    }
-                    default -> {
-                        render(ctx);
-                        return;
-                    }
+            switch (st.getStatus()) {
+                case APPROVED -> {
+                    clearNotes(ctx.getAuthenticationSession());
+                    ctx.success();
                 }
-            } catch (ApiException e) {
-                ctx.failureChallenge(
-                        AuthenticationFlowError.INTERNAL_ERROR,
-                        ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE)
-                );
-                return;
+                case DENIED -> {
+                    clearNotes(ctx.getAuthenticationSession());
+                    ctx.failureChallenge(
+                            AuthenticationFlowError.INVALID_USER,
+                            ctx.form()
+                                    .setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
+                                    .createErrorPage(Status.UNAUTHORIZED)
+                    );
+                }
+                case EXPIRED, NOT_FOUND -> {
+                    clearNotes(ctx.getAuthenticationSession());
+                    ctx.failureChallenge(
+                            AuthenticationFlowError.EXPIRED_CODE,
+                            ctx.form().setError("Challenge expired").createErrorPage(Status.UNAUTHORIZED)
+                    );
+                }
+                default -> render(ctx);
             }
+        } catch (ApiException e) {
+            LOG.warn("ECG status check failed", e);
+            ctx.failureChallenge(
+                    AuthenticationFlowError.INTERNAL_ERROR,
+                    ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE)
+            );
+        } catch (Exception e) {
+            LOG.error("ECG unexpected in action()", e);
+            ctx.failureChallenge(
+                    AuthenticationFlowError.INTERNAL_ERROR,
+                    ctx.form().setError("Unexpected error").createErrorPage(Status.INTERNAL_SERVER_ERROR)
+            );
         }
-
-        String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
-        if (idStr != null && !idStr.isBlank()) {
-            render(ctx);
-        } else {
-            authenticate(ctx);
-        }
     }
 
-    @Override
-    public boolean requiresUser() {
-        return true;
-    }
-
-    @Override
-    public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) {
-        return true;
-    }
-
-    @Override
-    public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) {
-    }
-
-    @Override
-    public void close() {
-    }
+    @Override public boolean requiresUser() { return true; }
+    @Override public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) { return true; }
+    @Override public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) { }
+    @Override public void close() { }
 }

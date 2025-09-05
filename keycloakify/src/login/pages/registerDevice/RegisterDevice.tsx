@@ -1,4 +1,3 @@
-// RegisterDevice.tsx
 import { useState, useMemo, useEffect, useRef } from "react";
 import type { PageProps } from "keycloakify/login/pages/PageProps";
 import { getKcClsx } from "keycloakify/login/lib/kcClsx";
@@ -13,6 +12,13 @@ import type { FlowStatus } from "../../../types/FlowStatus";
 
 type Props = PageProps<Extract<KcContext, { pageId: "registerDevice.ftl" }>, I18n>;
 
+const TERMINAL: readonly FlowStatus[] = [
+    "APPROVED",
+    "DENIED",
+    "EXPIRED",
+    "NOT_FOUND"
+] as const;
+
 export default function RegisterDevice(props: Props) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
     const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
@@ -20,15 +26,19 @@ export default function RegisterDevice(props: Props) {
     const { url, qr, id, rootAuthSessionId, tabId, watchBase } = kcContext;
 
     const [status, setStatus] = useState<FlowStatus>("PENDING");
-    const confirmFormRef = useRef<HTMLFormElement>(null);
+    const isTerminal = TERMINAL.includes(status);
+
+    const finalizeFormRef = useRef<HTMLFormElement>(null);
+    const submittedRef = useRef(false);
 
     useStatus({ setStatus, id, rootAuthSessionId, tabId, watchBase });
 
     useEffect(() => {
-        if (status === "APPROVED") {
-            confirmFormRef.current?.submit();
+        if (isTerminal && !submittedRef.current) {
+            submittedRef.current = true;
+            finalizeFormRef.current?.submit();
         }
-    }, [status]);
+    }, [isTerminal]);
 
     const hint = useMemo(() => {
         switch (status) {
@@ -37,6 +47,10 @@ export default function RegisterDevice(props: Props) {
             case "DENIED":
                 return labels.denied;
             case "EXPIRED":
+            case "NOT_FOUND":
+                return labels.expired ?? "Pairing expired or not found.";
+            case "CREATED":
+            case "PENDING":
             default:
                 return labels.hint;
         }
@@ -49,13 +63,12 @@ export default function RegisterDevice(props: Props) {
             case "DENIED":
                 return "danger";
             case "EXPIRED":
+            case "NOT_FOUND":
                 return "warning";
             default:
                 return "info";
         }
     }, [status]);
-
-    const showRestart = status !== "PENDING" && status !== "APPROVED";
 
     const Title = () => (
         <div>
@@ -73,56 +86,22 @@ export default function RegisterDevice(props: Props) {
             headerNode={<Title />}
         >
             <div className={styles.panel} aria-live="polite">
-                {qr && <QRCode style={{ height: "auto", width: "80%" }} value={qr} />}
+                {qr && (
+                    <QRCode
+                        style={{ height: "auto", width: "80%" }}
+                        value={qr}
+                    />
+                )}
                 <InfoBox hint={hint} type={alertType} />
-
-                {status === "APPROVED" && (
-                    <button
-                        type="button"
-                        className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
-                        onClick={() => confirmFormRef.current?.submit()}
-                    >
-                        Continue
-                    </button>
-                )}
-
-                {showRestart && (
-                    <>
-                        {url.loginRestartFlowUrl ? (
-                            <a
-                                className={kcClsx(
-                                    "kcButtonClass",
-                                    "kcButtonPrimaryClass"
-                                )}
-                                href={url.loginRestartFlowUrl}
-                            >
-                                Restart login
-                            </a>
-                        ) : (
-                            <form method="post" action={url.loginAction}>
-                                <input type="hidden" name="cancel" value="1" />
-                                <button
-                                    className={kcClsx(
-                                        "kcButtonClass",
-                                        "kcButtonPrimaryClass"
-                                    )}
-                                    type="submit"
-                                >
-                                    Restart login
-                                </button>
-                            </form>
-                        )}
-                    </>
-                )}
+                <InfoBox hint={qr} type={alertType} />
             </div>
+
             <form
-                ref={confirmFormRef}
+                ref={finalizeFormRef}
                 method="post"
                 action={url.loginAction}
                 style={{ display: "none" }}
-            >
-                <input type="hidden" name="confirm" value="1" />
-            </form>
+            />
         </Template>
     );
 }
