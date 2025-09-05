@@ -30,12 +30,32 @@ public class RegisterDeviceRequiredAction
     private static final String JTI = "ecg.pair.jti";
     private static final String JWT = "ecg.pair.jwt";
 
-    @Override public String getId() { return ID; }
-    @Override public String getDisplayText() { return "Register device"; }
-    @Override public RequiredActionProvider create(KeycloakSession session) { return this; }
-    @Override public void init(Config.Scope scope) { }
-    @Override public void postInit(KeycloakSessionFactory keycloakSessionFactory) { }
-    @Override public void close() { }
+    @Override
+    public String getId() {
+        return ID;
+    }
+
+    @Override
+    public String getDisplayText() {
+        return "Register device";
+    }
+
+    @Override
+    public RequiredActionProvider create(KeycloakSession session) {
+        return this;
+    }
+
+    @Override
+    public void init(Config.Scope scope) {
+    }
+
+    @Override
+    public void postInit(KeycloakSessionFactory keycloakSessionFactory) {
+    }
+
+    @Override
+    public void close() {
+    }
 
     @Override
     public void evaluateTriggers(RequiredActionContext ctx) {
@@ -136,30 +156,30 @@ public class RegisterDeviceRequiredAction
             String kcSessionId = as.getParentSession().getId();
             var st = oc.getPairingStatus(UUID.fromString(jtiStr), kcSessionId);
 
+
             switch (st.getStatus()) {
                 case APPROVED -> {
                     markDeviceRegistered(ctx.getUser());
-                    clearNotes(as);
+                    clearPending(ctx.getUser());
+                    clearNotes(ctx.getAuthenticationSession());
                     ctx.success();
                 }
-                case DENIED -> {
-                    clearNotes(as);
-                    ctx.challenge(
-                            ctx.form()
-                                    .setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
-                                    .createErrorPage(Status.UNAUTHORIZED)
-                    );
+                case DENIED, EXPIRED, NOT_FOUND -> {
+                    clearNotes(ctx.getAuthenticationSession());
+                    if (isPendingRegistration(ctx.getUser())) {
+                        deleteUser(ctx);
+                        ctx.challenge(
+                                ctx.form().setError("Registration failed: device not registered.")
+                                        .createErrorPage(Status.UNAUTHORIZED)
+                        );
+                    } else {
+                        ctx.challenge(
+                                ctx.form().setError("Device registration failed.")
+                                        .createErrorPage(Status.UNAUTHORIZED)
+                        );
+                    }
                 }
-                case EXPIRED, NOT_FOUND -> {
-                    clearNotes(as);
-                    ctx.challenge(
-                            ctx.form().setError("Pairing expired.").createErrorPage(Status.UNAUTHORIZED)
-                    );
-                }
-                case PENDING, CREATED -> {
-                    // Not terminal yet → re-render the QR + keep streaming
-                    render(ctx);
-                }
+                case PENDING, CREATED -> render(ctx);
             }
 
         } catch (ApiException e) {
@@ -173,6 +193,25 @@ public class RegisterDeviceRequiredAction
             );
         }
     }
+
+    private static final String REG_PENDING = "hauthRegistrationPending";
+
+    private boolean isPendingRegistration(UserModel user) {
+        return "true".equals(user.getFirstAttribute(REG_PENDING));
+    }
+
+    private void clearPending(UserModel user) {
+        user.removeAttribute(REG_PENDING);
+    }
+
+    private void deleteUser(RequiredActionContext ctx) {
+        var realm = ctx.getRealm();
+        var user = ctx.getUser();
+        var id = user.getId();
+        ctx.getSession().users().removeUser(realm, user);
+        LOG.infof("Deleted user %s due to failed device registration", id);
+    }
+
 
     private boolean isDeviceRegistered(UserModel user) {
         return "true".equals(user.getFirstAttribute("hauthDeviceRegistered"));
