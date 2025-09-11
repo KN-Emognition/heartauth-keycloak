@@ -28,7 +28,7 @@ jobs:
       #   run: mvn -B -ntp -f spi/pom.xml test
 
       - name: Package (spi)
-        run: mvn -B -ntp -DskipTests -f authenticicators/pom.xml package
+        run: mvn -B -ntp -DskipTests -f spi/pom.xml package
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
