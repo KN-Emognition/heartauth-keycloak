@@ -1,10 +1,9 @@
-package knemognition.heartauth.authenticators.ecg;
+package knemognition.hauth.spi.ecg;
 
 
 import org.keycloak.Config.Scope;
 import org.keycloak.authentication.Authenticator;
 import org.keycloak.authentication.AuthenticatorFactory;
-import org.keycloak.authentication.ConfigurableAuthenticatorFactory;
 import org.keycloak.models.AuthenticationExecutionModel.Requirement;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
@@ -47,7 +46,6 @@ public class EcgAuthenticatorFactory implements AuthenticatorFactory {
     public List<ProviderConfigProperty> getConfigProperties() {
         return List.of();
     }
-
 
     @Override
     public Requirement[] getRequirementChoices() {

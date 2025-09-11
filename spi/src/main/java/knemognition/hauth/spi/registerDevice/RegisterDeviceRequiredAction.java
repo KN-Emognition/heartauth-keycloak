@@ -1,101 +1,45 @@
-package knemognition.heartauth.authenticators.registerDevice;
+package knemognition.hauth.spi.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import knemognition.heartauth.authenticators.shared.OrchestratorClient;
-import knemognition.heartauth.authenticators.status.StatusWatchResourceProviderFactory;
-import knemognition.heartauth.orchestrator.model.PairingCreateResponse;
-import knemognition.heartauth.orchestrator.invoker.ApiException;
+import knemognition.hauth.orchestrator.invoker.ApiException;
+import knemognition.hauth.spi.gateway.OrchClient;
+import knemognition.hauth.spi.status.StatusWatchResourceProviderFactory;
+import knemognition.hauth.orchestrator.model.PairingCreateResponse;
 import org.jboss.logging.Logger;
-import org.keycloak.Config;
 import org.keycloak.authentication.RequiredActionContext;
-import org.keycloak.authentication.RequiredActionFactory;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.models.*;
-import org.keycloak.provider.ServerInfoAwareProviderFactory;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.net.URI;
-import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
-import static knemognition.heartauth.authenticators.shared.OrchestratorClient.client;
-
-public class RegisterDeviceRequiredAction
-        implements RequiredActionProvider, RequiredActionFactory, ServerInfoAwareProviderFactory {
+public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private static final Logger LOG = Logger.getLogger(RegisterDeviceRequiredAction.class);
 
-    public static final String ID = "register-device";
     private static final String JTI = "ecg.pair.jti";
     private static final String JWT = "ecg.pair.jwt";
 
-    @Override
-    public String getId() {
-        return ID;
-    }
+    private static final String REG_PENDING = "hauthRegistrationPending";
+    private static final String DEV_REGISTERED = "hauthDeviceRegistered";
 
-    @Override
-    public String getDisplayText() {
-        return "Register device";
-    }
+    private final KeycloakSession session;
 
-    @Override
-    public RequiredActionProvider create(KeycloakSession session) {
-        return this;
-    }
-
-    @Override
-    public void init(Config.Scope scope) {
-    }
-
-    @Override
-    public void postInit(KeycloakSessionFactory keycloakSessionFactory) {
-    }
-
-    @Override
-    public void close() {
+    public RegisterDeviceRequiredAction(KeycloakSession session) {
+        this.session = Objects.requireNonNull(session, "session");
     }
 
     @Override
     public void evaluateTriggers(RequiredActionContext ctx) {
         UserModel user = ctx.getUser();
         if (!isDeviceRegistered(user)) {
-            user.addRequiredAction(ID);
+            user.addRequiredAction(RegisterDeviceRequiredActionFactory.ID);
         } else {
-            user.removeRequiredAction(ID);
+            user.removeRequiredAction(RegisterDeviceRequiredActionFactory.ID);
         }
-    }
-
-    private void render(RequiredActionContext ctx) {
-        AuthenticationSessionModel as = ctx.getAuthenticationSession();
-
-        String jti = as.getAuthNote(JTI); // UUID string
-        String jwt = as.getAuthNote(JWT);
-
-        URI watchBase = ctx.getSession().getContext().getUri()
-                .getBaseUriBuilder()
-                .path("realms")
-                .path(ctx.getRealm().getName())
-                .path(StatusWatchResourceProviderFactory.ID)
-                .path("watch")
-                .path("pairing")
-                .build();
-
-        Response challenge = ctx.form()
-                .setAttribute("qr", jwt)
-                .setAttribute("id", jti)
-                .setAttribute("rootAuthSessionId", as.getParentSession().getId())
-                .setAttribute("tabId", as.getTabId())
-                .setAttribute("watchBase", watchBase.toString())
-                .createForm("registerDevice.ftl");
-
-        ctx.challenge(challenge);
-    }
-
-    private static void clearNotes(AuthenticationSessionModel s) {
-        s.removeAuthNote(JTI);
-        s.removeAuthNote(JWT);
     }
 
     @Override
@@ -103,16 +47,17 @@ public class RegisterDeviceRequiredAction
         try {
             AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            String existing = sess.getAuthNote(JTI);
-            if (existing != null && !existing.isBlank() && sess.getAuthNote(JWT) != null) {
+            String existingJti = sess.getAuthNote(JTI);
+            String existingJwt = sess.getAuthNote(JWT);
+            if (existingJti != null && !existingJti.isBlank() && existingJwt != null) {
                 render(ctx);
                 return;
             }
 
-            OrchestratorClient oc = client(ctx.getRealm());
+            OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
             UUID userId = UUID.fromString(ctx.getUser().getId());
-            PairingCreateResponse res = oc.createPairing(userId);
 
+            PairingCreateResponse res = oc.createPairing(userId);
             sess.setAuthNote(JTI, res.getJti().toString());
             sess.setAuthNote(JWT, res.getJwt());
 
@@ -141,21 +86,18 @@ public class RegisterDeviceRequiredAction
 
     @Override
     public void processAction(RequiredActionContext ctx) {
-        // No clickable actions expected. The page will POST here automatically on terminal statuses.
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
         String jtiStr = as.getAuthNote(JTI);
         if (jtiStr == null || jtiStr.isBlank()) {
-            ctx.challenge(
-                    ctx.form().setError("Missing token.").createErrorPage(Status.INTERNAL_SERVER_ERROR)
-            );
+            ctx.challenge(ctx.form().setError("Missing token.")
+                    .createErrorPage(Status.INTERNAL_SERVER_ERROR));
             return;
         }
 
         try {
-            OrchestratorClient oc = client(ctx.getRealm());
+            OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
             String kcSessionId = as.getParentSession().getId();
             var st = oc.getPairingStatus(UUID.fromString(jtiStr), kcSessionId);
-
 
             switch (st.getStatus()) {
                 case APPROVED -> {
@@ -181,20 +123,54 @@ public class RegisterDeviceRequiredAction
                 }
                 case PENDING, CREATED -> render(ctx);
             }
-
         } catch (ApiException e) {
             ctx.challenge(
-                    ctx.form().setError("Upstream unavailable.").createErrorPage(Status.SERVICE_UNAVAILABLE)
+                    ctx.form().setError("Upstream unavailable.")
+                            .createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
             LOG.error("RegisterDevice: unexpected in processAction()", e);
             ctx.challenge(
-                    ctx.form().setError("Unexpected error.").createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                    ctx.form().setError("Unexpected error.")
+                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
     }
 
-    private static final String REG_PENDING = "hauthRegistrationPending";
+    @Override
+    public void close() {
+    }
+
+    private void render(RequiredActionContext ctx) {
+        AuthenticationSessionModel as = ctx.getAuthenticationSession();
+
+        String jti = as.getAuthNote(JTI);
+        String jwt = as.getAuthNote(JWT);
+
+        URI watchBase = ctx.getSession().getContext().getUri()
+                .getBaseUriBuilder()
+                .path("realms")
+                .path(ctx.getRealm().getName())
+                .path(StatusWatchResourceProviderFactory.ID)
+                .path("watch")
+                .path("pairing")
+                .build();
+
+        Response page = ctx.form()
+                .setAttribute("qr", jwt)
+                .setAttribute("id", jti)
+                .setAttribute("rootAuthSessionId", as.getParentSession().getId())
+                .setAttribute("tabId", as.getTabId())
+                .setAttribute("watchBase", watchBase.toString())
+                .createForm("registerDevice.ftl");
+
+        ctx.challenge(page);
+    }
+
+    private static void clearNotes(AuthenticationSessionModel s) {
+        s.removeAuthNote(JTI);
+        s.removeAuthNote(JWT);
+    }
 
     private boolean isPendingRegistration(UserModel user) {
         return "true".equals(user.getFirstAttribute(REG_PENDING));
@@ -206,23 +182,17 @@ public class RegisterDeviceRequiredAction
 
     private void deleteUser(RequiredActionContext ctx) {
         var realm = ctx.getRealm();
-        var user = ctx.getUser();
-        var id = user.getId();
+        var user  = ctx.getUser();
+        var id    = user.getId();
         ctx.getSession().users().removeUser(realm, user);
         LOG.infof("Deleted user %s due to failed device registration", id);
     }
 
-
     private boolean isDeviceRegistered(UserModel user) {
-        return "true".equals(user.getFirstAttribute("hauthDeviceRegistered"));
+        return "true".equals(user.getFirstAttribute(DEV_REGISTERED));
     }
 
     private void markDeviceRegistered(UserModel user) {
-        user.setSingleAttribute("hauthDeviceRegistered", "true");
-    }
-
-    @Override
-    public Map<String, String> getOperationalInfo() {
-        return Map.of();
+        user.setSingleAttribute(DEV_REGISTERED, "true");
     }
 }

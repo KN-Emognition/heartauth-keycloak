@@ -1,10 +1,11 @@
-package knemognition.heartauth.authenticators.ecg;
+package knemognition.hauth.spi.ecg;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import knemognition.heartauth.authenticators.shared.OrchestratorClient;
-import knemognition.heartauth.authenticators.status.StatusWatchResourceProviderFactory;
-import knemognition.heartauth.orchestrator.invoker.ApiException;
+import knemognition.hauth.spi.gateway.OrchClient;
+import knemognition.hauth.spi.status.StatusWatchResourceProviderFactory;
+import knemognition.hauth.orchestrator.invoker.ApiException;
+import knemognition.hauth.orchestrator.model.StatusResponse;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
@@ -17,13 +18,11 @@ import org.keycloak.sessions.AuthenticationSessionModel;
 import java.net.URI;
 import java.util.UUID;
 
-import static knemognition.heartauth.authenticators.shared.OrchestratorClient.client;
 
 public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
-
     private static final String CHALLENGE_ID = "ecg.challengeId";
-    private static final int DEFAULT_TTL_SECONDS = 120;
+
 
     private void render(AuthenticationFlowContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
@@ -66,10 +65,10 @@ public class EcgAuthenticator implements Authenticator {
                 return;
             }
 
-            OrchestratorClient oc = client(ctx.getRealm());
+            OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
             UUID userId = parseUserId(ctx.getUser());
 
-            UUID challengeId = oc.createChallenge(userId, DEFAULT_TTL_SECONDS);
+            UUID challengeId = orchestrator.createChallenge(userId);
             sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
 
             render(ctx);
@@ -103,9 +102,10 @@ public class EcgAuthenticator implements Authenticator {
         UUID id = UUID.fromString(idStr);
         try {
             String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
-            var st = client(ctx.getRealm()).getChallengeStatus(id, kcSession);
+            OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
+            StatusResponse status = orchestrator.getChallengeStatus(id, kcSession);
 
-            switch (st.getStatus()) {
+            switch (status.getStatus()) {
                 case APPROVED -> {
                     clearNotes(ctx.getAuthenticationSession());
                     ctx.success();
@@ -115,7 +115,7 @@ public class EcgAuthenticator implements Authenticator {
                     ctx.failureChallenge(
                             AuthenticationFlowError.INVALID_USER,
                             ctx.form()
-                                    .setError("Denied" + (st.getReason() != null ? ": " + st.getReason() : ""))
+                                    .setError("Denied" + (status.getReason() != null ? ": " + status.getReason() : ""))
                                     .createErrorPage(Status.UNAUTHORIZED)
                     );
                 }

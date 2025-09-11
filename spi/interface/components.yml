@@ -141,6 +141,11 @@ components:
         userId:
           type: string
           format: uuid
+        ttlSeconds:
+          type: integer
+          minimum: 30
+          maximum: 300
+          default: 120
     PairingCreateResponse:
       type: object
       required:
