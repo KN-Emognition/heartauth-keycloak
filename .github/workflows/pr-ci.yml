@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- Build authenticators (Maven/Java 17) ---
+      # --- Build spi (Maven/Java 17) ---
       - name: Set up Java 17 (Temurin) with Maven cache
         uses: actions/setup-java@v4
         with:
@@ -22,15 +22,15 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Prime Maven deps (authenticators)
-        run: mvn -B -q -DskipTests -f authenticators/pom.xml dependency:go-offline
+      - name: Prime Maven deps (spi)
+        run: mvn -B -q -DskipTests -f spi/pom.xml dependency:go-offline
 
       # Optional: run tests
-      # - name: Test (authenticators)
-      #   run: mvn -B -ntp -f authenticators/pom.xml test
+      # - name: Test (spi)
+      #   run: mvn -B -ntp -f spi/pom.xml test
 
-      - name: Package (authenticators)
-        run: mvn -B -ntp -DskipTests -f authenticators/pom.xml package
+      - name: Package (spi)
+        run: mvn -B -ntp -DskipTests -f spi/pom.xml package
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4

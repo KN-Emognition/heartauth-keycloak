@@ -21,14 +21,14 @@ jobs:
           cache: maven
 
       - name: Prime Maven deps
-        run: mvn -B -q -DskipTests -f authenticators/pom.xml dependency:go-offline
+        run: mvn -B -q -DskipTests -f spi/pom.xml dependency:go-offline
 
       # Optional: tests
-      # - name: Test (authenticators)
-      #   run: mvn -B -ntp -f authenticators/pom.xml test
+      # - name: Test (spi)
+      #   run: mvn -B -ntp -f spi/pom.xml test
 
-      - name: Package (authenticators)
-        run: mvn -B -ntp -DskipTests -f authenticators/pom.xml package
+      - name: Package (spi)
+        run: mvn -B -ntp -DskipTests -f spi/pom.xml package
 
       - name: Use Node.js 20
         uses: actions/setup-node@v4
