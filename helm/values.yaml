@@ -36,22 +36,16 @@ resources:
 env:
   KC_HOSTNAME_URL: "https://hauth.pl/keycloak"
   KC_HOSTNAME_ADMIN_URL: "https://hauth.pl/keycloak"
-  KC_DB: postgres
-  KC_HEALTH_ENABLED: true
   JAVA_OPTS_APPEND: "-XX:InitialRAMPercentage=40 -XX:MaxRAMPercentage=75"
   KC_PROXY_HEADERS: xforwarded
+
   KC_HOSTNAME_STRICT: "false"
   KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
-  KC_HTTP_RELATIVE_PATH: "/keycloak"
-  KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
   KC_PROXY: "edge"
   
 secretEnv:
-  KC_DB_URL: kc-db-url
-  KC_DB_USERNAME: kc-db-username
-  KC_DB_PASSWORD: kc-db-password
 secret:
-  name: keycloak-secret
+  name: 
 
 realm:
   enabled: true

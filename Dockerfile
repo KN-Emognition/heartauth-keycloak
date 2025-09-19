@@ -30,8 +30,11 @@ WORKDIR /opt/keycloak
 # Add providers/themes built above
 COPY --chown=1000:0 --from=build-auth  /src/spi/target/*.jar              /opt/keycloak/providers/
 COPY --chown=1000:0 --from=build-theme /src/keycloakify/dist_keycloak/*.jar /opt/keycloak/providers/
-
-# Build the optimized server image (layers the providers into the distribution)
+ENV KC_DB=postgres \
+    KC_HEALTH_ENABLED=true \
+    KC_HTTP_RELATIVE_PATH=/keycloak \
+    KC_HTTP_MANAGEMENT_RELATIVE_PATH=/
+    
 RUN /opt/keycloak/bin/kc.sh build
 
 ENTRYPOINT ["/opt/keycloak/bin/kc.sh"]
