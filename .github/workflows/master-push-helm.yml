@@ -1,0 +1,48 @@
+name: Master Push Helm
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'helm/**'
+
+jobs:
+  release-helm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CHART_DIR: ./helm 
+      HELM_VERSION: 0.1.0
+      SERVICE_NAME: keycloak-iam
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Short SHA
+        id: vars
+        run: echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Helm registry login (Docker Hub OCI)
+        env:
+          DH_USER: ${{ secrets.P3_DH_USERNAME }}
+          DH_TOKEN: ${{ secrets.P3_DH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          helm registry logout registry-1.docker.io || true
+          # Use password-stdin correctly
+          printf %s "${DH_TOKEN}" | helm registry login registry-1.docker.io \
+            --username "${DH_USER}" --password-stdin
+          echo "Helm login OK"
+
+      - name: Package Helm chart
+        run: |
+          helm package "${CHART_DIR}" \
+            --version "${HELM_VERSION}-sha.${{ steps.vars.outputs.short_sha }}" \
+            --app-version "${HELM_VERSION}" 
+      - name: Push Helm chart to OCI repo with -helm suffix
+        run: |
+          helm push ${{ env.SERVICE_NAME }}-helm-${{ env.HELM_VERSION }}-sha.${{ steps.vars.outputs.short_sha }}.tgz  oci://registry-1.docker.io/${{ secrets.P3_DH_USERNAME }} --debug

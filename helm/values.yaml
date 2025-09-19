@@ -1,0 +1,67 @@
+# helm template ./helm -f helm/values.yaml > helm/rendered/core.yaml
+namespaceOverride:
+fullnameOverride: keycloak-iam
+
+image:
+  repository: poziomk3/keycloak-iam
+  tag: v1.0.1
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+probes:
+  port: 9000
+  readiness:
+    path: /health/ready
+    initialDelaySeconds: 60
+    periodSeconds: 10
+  liveness:
+    path: /health/live
+    initialDelaySeconds: 60
+    periodSeconds: 10
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+env:
+  KC_HOSTNAME_URL: "https://hauth.pl/keycloak"
+  KC_HOSTNAME_ADMIN_URL: "https://hauth.pl/keycloak"
+  KC_DB: postgres
+  KC_HEALTH_ENABLED: true
+  JAVA_OPTS_APPEND: "-XX:InitialRAMPercentage=40 -XX:MaxRAMPercentage=75"
+  KC_PROXY_HEADERS: xforwarded
+  KC_HOSTNAME_STRICT: "false"
+  KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
+  KC_HTTP_RELATIVE_PATH: "/keycloak"
+  KC_HTTP_MANAGEMENT_RELATIVE_PATH: "/"
+  KC_PROXY: "edge"
+  
+secretEnv:
+  KC_DB_URL: kc-db-url
+  KC_DB_USERNAME: kc-db-username
+  KC_DB_PASSWORD: kc-db-password
+secret:
+  name: keycloak-secret
+
+realm:
+  enabled: true
+  importOnStartup: true     
+  importOverride: true
+  useExistingConfigMap: false
+  json: |
+    {
+      "realm": "myrealm",
+      "enabled": true,
+      "users": [],
+      "clients": []
+    }

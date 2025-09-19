@@ -1,0 +1,6 @@
+apiVersion: v2
+name: keycloak-iam-helm
+description: Keycloak IAM with Heartauth SPIS
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

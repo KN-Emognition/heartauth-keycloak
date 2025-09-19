@@ -1,0 +1,155 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keycloak-iam.fullname" . }}
+  labels:
+    app: {{ include "keycloak-iam.fullname" . }}
+    {{- include "keycloak-iam.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ include "keycloak-iam.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "keycloak-iam.fullname" . }}
+        {{- include "keycloak-iam.labels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if and .Values.realm.enabled (not .Values.realm.useExistingConfigMap) }}
+      # Roll pods when realm.json changes
+      annotations:
+        checksum/realm-config: {{ .Values.realm.json | toJson | sha256sum }}
+      {{- end }}
+    spec:
+      containers:
+        - name: keycloak
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - "start"
+            - "--optimized"
+            {{- if .Values.realm.importOnStartup }}
+            - "--import-realm"
+            - "--import-realm-override={{ .Values.realm.importOverride | default "true" }}"
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort | default 8080 }}
+          {{- $hasEnv := or .Values.env .Values.secretEnv }}
+          {{- if $hasEnv }}
+          env:
+            {{- if .Values.env }}
+              {{- if kindIs "map" .Values.env }}
+                {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+                {{- end }}
+              {{- else }}
+                {{- toYaml .Values.env | nindent 12 }}
+              {{- end }}
+            {{- end }}
+            {{- if .Values.secretEnv }}
+              {{- $defaultSecret := (include "keycloak-iam.fullname" .) -}}
+              {{- if and (hasKey .Values "secret") (kindIs "map" .Values.secret) (hasKey .Values.secret "name") -}}
+                {{- $defaultSecret = default $defaultSecret .Values.secret.name -}}
+              {{- else if and (hasKey .Values "secret") (kindIs "string" .Values.secret) -}}
+                {{- $defaultSecret = .Values.secret -}}
+              {{- end }}
+              {{- range $name, $ref := .Values.secretEnv }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  {{- if kindIs "map" $ref }}
+                  name: {{ $ref.name }}
+                  key: {{ $ref.key }}
+                  {{- else }}
+                  name: {{ $defaultSecret }}
+                  key: {{ $ref }}
+                  {{- end }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path | default "/health/ready" }}
+              port: {{ .Values.probes.port | default (.Values.service.targetPort | default 8080) }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds | default 15 }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold | default 6 }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path | default "/health/live" }}
+              port: {{ .Values.probes.port | default (.Values.service.targetPort | default 8080) }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds | default 30 }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold | default 6 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.realm.enabled }}
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.realm.enabled }}
+        - name: realm-import
+          configMap:
+            name: {{ if .Values.realm.useExistingConfigMap }}{{ .Values.realm.existingConfigMapName }}{{ else }}{{ include "keycloak-iam.fullname" . }}-realm{{ end }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "keycloak-iam.fullname" . }}
+  labels:
+    app: {{ include "keycloak-iam.fullname" . }}
+    {{- include "keycloak-iam.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  selector:
+    app: {{ include "keycloak-iam.fullname" . }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port | default 80 }}
+      targetPort: {{ .Values.service.targetPort | default 8080 }}
+---
+{{- if and .Values.realm.enabled (not .Values.realm.useExistingConfigMap) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "keycloak-iam.fullname" . }}-realm
+  labels:
+    app: {{ include "keycloak-iam.fullname" . }}
+    {{- include "keycloak-iam.labels" . | nindent 4 }}
+data:
+  # Mounted at /opt/keycloak/data/import/realm.json
+  realm.json: |
+    {{- .Values.realm.json | nindent 4 }}
+{{- end }}
+{{- define "keycloak-iam.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "keycloak-iam.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "keycloak-iam.name" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "keycloak-iam.labels" -}}
+app.kubernetes.io/name: {{ include "keycloak-iam.name" . }}
+helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- if .Values.commonLabels }}
+{{- toYaml .Values.commonLabels | nindent 0 }}
+{{- end }}
+{{- end -}}
