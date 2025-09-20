@@ -34,16 +34,19 @@ resources:
     memory: 4Gi
 
 env:
-  KC_HOSTNAME_URL: "https://hauth.pl/keycloak"
-  KC_HOSTNAME_ADMIN_URL: "https://hauth.pl/keycloak"
-  JAVA_OPTS_APPEND: "-XX:InitialRAMPercentage=40 -XX:MaxRAMPercentage=75"
+  KC_HTTP_RELATIVE_PATH: /keycloak
+  KC_HTTP_ENABLED: true
+  JAVA_OPTS_APPEND: -XX:InitialRAMPercentage=40 -XX:MaxRAMPercentage=75
   KC_PROXY_HEADERS: xforwarded
-
-  KC_HOSTNAME_STRICT: "false"
-  KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"
-  KC_PROXY: "edge"
+  KC_HOSTNAME_STRICT: false
+  KC_HOSTNAME_BACKCHANNEL_DYNAMIC: false
+  KC_PROXY: edge
   
 secretEnv:
+  KC_BOOTSTRAP_ADMIN_USERNAME: KC_BOOTSTRAP_ADMIN_USERNAME
+  KC_BOOTSTRAP_ADMIN_PASSWORD: KC_BOOTSTRAP_ADMIN_PASSWORD
+  KC_DB_USERNAME: KC_DB_USERNAME
+  KC_DB_PASSWORD: KC_DB_PASSWORD
 secret:
   name: 
 
