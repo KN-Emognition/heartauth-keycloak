@@ -1,19 +1,23 @@
-package knemognition.hauth.spi.status;
+package knemognition.heartauth.spi.status;
 
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
 import jakarta.ws.rs.sse.SseEventSink;
-import knemognition.hauth.orchestrator.model.FlowStatus;
-import knemognition.hauth.spi.gateway.OrchClient;
-import knemognition.hauth.orchestrator.invoker.ApiException;
-import knemognition.hauth.orchestrator.model.StatusResponse;
-import org.keycloak.models.*;
-import org.keycloak.sessions.*;
+import knemognition.heartauth.orchestrator.ApiException;
+import knemognition.heartauth.orchestrator.model.FlowStatusDto;
+import knemognition.heartauth.orchestrator.model.StatusResponseDto;
+import knemognition.heartauth.spi.gateway.OrchClient;
+import org.keycloak.models.ClientModel;
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.RealmModel;
+import org.keycloak.sessions.AuthenticationSessionModel;
+import org.keycloak.sessions.RootAuthenticationSessionModel;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -38,13 +42,13 @@ public class StatusWatchResource {
     public void watchEcg(@QueryParam("root") String rootId,
                          @QueryParam("tab") String tabId,
                          @QueryParam("id") String challengeIdStr,
-                         @jakarta.ws.rs.core.Context SseEventSink sink,
-                         @jakarta.ws.rs.core.Context Sse sse) {
+                         @Context SseEventSink sink,
+                         @Context Sse sse) {
 
         watchStatus(rootId, tabId, challengeIdStr, sink, sse,
                 (clientApi, kcSessionId) -> {
                     try {
-                        return clientApi.getChallengeStatus(UUID.fromString(challengeIdStr), kcSessionId);
+                        return clientApi.getChallengeStatus(UUID.fromString(challengeIdStr));
                     } catch (ApiException e) {
                         throw new RuntimeException(e);
                     }
@@ -59,13 +63,13 @@ public class StatusWatchResource {
     public void watchPairing(@QueryParam("root") String rootId,
                              @QueryParam("tab") String tabId,
                              @QueryParam("id") String pairingIdStr,
-                             @jakarta.ws.rs.core.Context SseEventSink sink,
-                             @jakarta.ws.rs.core.Context Sse sse) {
+                             @Context SseEventSink sink,
+                             @Context Sse sse) {
 
         watchStatus(rootId, tabId, pairingIdStr, sink, sse,
                 (clientApi, kcSessionId) -> {
                     try {
-                        return clientApi.getPairingStatus(UUID.fromString(pairingIdStr), kcSessionId);
+                        return clientApi.getPairingStatus(UUID.fromString(pairingIdStr));
                     } catch (ApiException e) {
                         throw new RuntimeException(e);
                     }
@@ -79,14 +83,18 @@ public class StatusWatchResource {
                              String entityIdStr,
                              SseEventSink sink,
                              Sse sse,
-                             BiFunction<OrchClient, String, StatusResponse> resolver,
+                             BiFunction<OrchClient, String, StatusResponseDto> resolver,
                              boolean stopOnTerminal) {
 
-        RealmModel realm = session.getContext().getRealm();
+        RealmModel realm = session.getContext()
+                .getRealm();
         RootAuthenticationSessionModel root = session.authenticationSessions()
                 .getRootAuthenticationSession(realm, rootId);
 
-        if (root == null) { close(sink); return; }
+        if (root == null) {
+            close(sink);
+            return;
+        }
 
         AuthenticationSessionModel as = resolveAuthSession(root, tabId);
         if (as == null || entityIdStr == null || entityIdStr.isBlank()) {
@@ -104,7 +112,7 @@ public class StatusWatchResource {
 
         final String kcSessionId = root.getId();
 
-        if (!safeSendStatus(sink, sse, POLL_PERIOD_MS, FlowStatus.PENDING)) {
+        if (!safeSendStatus(sink, sse, POLL_PERIOD_MS, FlowStatusDto.PENDING)) {
             close(sink);
             return;
         }
@@ -113,18 +121,22 @@ public class StatusWatchResource {
         try {
             while (!sink.isClosed()) {
                 try {
-                    StatusResponse st = resolver.apply(clientApi, kcSessionId);
+                    StatusResponseDto st = resolver.apply(clientApi, kcSessionId);
                     err = 0;
 
                     if (!safeSendStatus(sink, sse, POLL_PERIOD_MS, st.getStatus())) {
-                        close(sink); return;
+                        close(sink);
+                        return;
                     }
 
                     boolean terminal = switch (st.getStatus()) {
                         case APPROVED, DENIED, EXPIRED, NOT_FOUND -> true;
                         case PENDING, CREATED -> false;
                     };
-                    if (stopOnTerminal && terminal) { close(sink); return; }
+                    if (stopOnTerminal && terminal) {
+                        close(sink);
+                        return;
+                    }
 
                     Thread.sleep(POLL_PERIOD_MS);
                 } catch (Exception transientErr) {
@@ -133,32 +145,37 @@ public class StatusWatchResource {
                 }
             }
         } catch (InterruptedException ie) {
-            Thread.currentThread().interrupt();
+            Thread.currentThread()
+                    .interrupt();
         } finally {
             close(sink);
         }
     }
 
     private AuthenticationSessionModel resolveAuthSession(RootAuthenticationSessionModel root, String tabId) {
-        ClientModel kcClient = session.getContext().getClient();
+        ClientModel kcClient = session.getContext()
+                .getClient();
         AuthenticationSessionModel as = (kcClient != null)
                 ? root.getAuthenticationSession(kcClient, tabId)
                 : null;
 
         if (as != null) return as;
-        for (AuthenticationSessionModel child : root.getAuthenticationSessions().values()) {
+        for (AuthenticationSessionModel child : root.getAuthenticationSessions()
+                .values()) {
             if (Objects.equals(tabId, child.getTabId())) return child;
         }
         return null;
     }
 
-    private static boolean safeSendStatus(SseEventSink sink, Sse sse, int reconnectMs, FlowStatus status) {
+    private static boolean safeSendStatus(SseEventSink sink, Sse sse, int reconnectMs, FlowStatusDto status) {
         try {
             if (sink == null || sink.isClosed()) return false;
             OutboundSseEvent event = sse.newEventBuilder()
                     .mediaType(MediaType.APPLICATION_JSON_TYPE)
                     .reconnectDelay(reconnectMs)
-                    .data(StatusPayload.class, new StatusPayload(status))
+                    .data(StatusResponseDto.class, StatusResponseDto.builder()
+                            .status(status)
+                            .build())
                     .build();
             sink.send(event);
             return true;
@@ -169,11 +186,14 @@ public class StatusWatchResource {
 
 
     private static void sendAndCloseError(SseEventSink sink, Sse sse, int reconnectMs) {
-        safeSendStatus(sink, sse, reconnectMs, FlowStatus.NOT_FOUND);
+        safeSendStatus(sink, sse, reconnectMs, FlowStatusDto.NOT_FOUND);
         close(sink);
     }
 
     private static void close(SseEventSink sink) {
-        try { if (sink != null && !sink.isClosed()) sink.close(); } catch (Exception ignored) {}
+        try {
+            if (sink != null && !sink.isClosed()) sink.close();
+        } catch (Exception ignored) {
+        }
     }
 }

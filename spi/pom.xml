@@ -71,6 +71,18 @@
             <version>${jackson.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.12.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -89,29 +101,26 @@
                     <execution>
                         <id>generate-orchestrator-native</id>
                         <phase>generate-sources</phase>
-                        <goals><goal>generate</goal></goals>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/interface/internal.yml</inputSpec>
+                            <inputSpec>${project.basedir}/contract/internal.yml</inputSpec>
                             <generatorName>java</generatorName>
                             <library>native</library>
-                            <output>${project.build.directory}/generated-sources/orchestrator</output>
-                            <apiPackage>knemognition.hauth.orchestrator.api</apiPackage>
-                            <modelPackage>knemognition.hauth.orchestrator.model</modelPackage>
-                            <invokerPackage>knemognition.hauth.orchestrator.invoker</invokerPackage>
+                            <output>${project.build.directory}/generated-sources/openapi</output>
+                            <apiPackage>knemognition.heartauth.orchestrator.api</apiPackage>
+                            <modelPackage>knemognition.heartauth.orchestrator.model</modelPackage>
+                            <invokerPackage>knemognition.heartauth.orchestrator</invokerPackage>
                             <generateApiTests>false</generateApiTests>
                             <generateModelTests>false</generateModelTests>
-                            <generateApiDocumentation>false</generateApiDocumentation>
-                            <generateModelDocumentation>false</generateModelDocumentation>
-                            <skipIfSpecIsUnchanged>true</skipIfSpecIsUnchanged>
+                            <modelNameSuffix>Dto</modelNameSuffix>
                             <configOptions>
+                                <documentationProvider>none</documentationProvider>
                                 <dateLibrary>java8</dateLibrary>
                                 <useJakartaEe>true</useJakartaEe>
-                                <hideGenerationTimestamp>true</hideGenerationTimestamp>
                                 <openApiNullable>false</openApiNullable>
-                                <useOptional>false</useOptional>
-                                <serializationLibrary>jackson</serializationLibrary>
                                 <generateBuilders>true</generateBuilders>
-                                <disallowAdditionalPropertiesIfNotPresent>true</disallowAdditionalPropertiesIfNotPresent>
                             </configOptions>
                         </configuration>
                     </execution>

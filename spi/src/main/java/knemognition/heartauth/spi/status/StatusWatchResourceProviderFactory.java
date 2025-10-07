@@ -1,4 +1,4 @@
-package knemognition.hauth.spi.status;
+package knemognition.heartauth.spi.status;
 
 import org.keycloak.Config;
 import org.keycloak.models.KeycloakSession;

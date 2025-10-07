@@ -1,4 +1,4 @@
-package knemognition.hauth.spi.ecg;
+package knemognition.heartauth.spi.ecg;
 
 
 import org.keycloak.Config.Scope;

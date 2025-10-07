@@ -1,32 +1,30 @@
-package knemognition.hauth.spi.gateway;
+package knemognition.heartauth.spi.gateway;
 
-import knemognition.hauth.spi.config.HaConfig;
-import knemognition.hauth.spi.config.HaRealmSettings;
-import knemognition.hauth.orchestrator.api.ChallengeApi;
-import knemognition.hauth.orchestrator.api.PairingApi;
-import knemognition.hauth.orchestrator.invoker.ApiClient;
-import knemognition.hauth.orchestrator.invoker.ApiException;
-import knemognition.hauth.orchestrator.model.*;
+import knemognition.heartauth.orchestrator.ApiClient;
+import knemognition.heartauth.orchestrator.ApiException;
+import knemognition.heartauth.orchestrator.api.ChallengeApi;
+import knemognition.heartauth.orchestrator.api.PairingApi;
+import knemognition.heartauth.orchestrator.model.*;
+import knemognition.heartauth.spi.config.HaConfig;
+import knemognition.heartauth.spi.config.HaConstants;
+import knemognition.heartauth.spi.config.HaRealmSettings;
 import org.jboss.logging.Logger;
 import org.jboss.logging.MDC;
 import org.keycloak.models.RealmModel;
 
+import java.io.IOException;
 import java.net.Proxy;
 import java.net.ProxySelector;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+
 
 public final class OrchClient {
 
     private static final Logger LOG = Logger.getLogger(OrchClient.class);
-
-    private static final Duration TRANSPORT_TIMEOUT = Duration.ofSeconds(30);
-    private static final String AUTH_HEADER = "X-Api-Key";
-    private static final String REQUEST_ID_HEADER = "X-Route-Id";
-    private static final String MDC_ROUTE_ID = "routeId";
 
     private final ChallengeApi challengeApi;
     private final PairingApi pairingApi;
@@ -46,27 +44,28 @@ public final class OrchClient {
             }
 
             @Override
-            public void connectFailed(URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {
+            public void connectFailed(URI uri, SocketAddress sa, IOException ioe) {
             }
         };
 
         HttpClient.Builder http = HttpClient.newBuilder()
-                .connectTimeout(TRANSPORT_TIMEOUT)
+                .connectTimeout(HaConstants.TRANSPORT_TIMEOUT)
                 .proxy(noProxy);
 
         ApiClient apiClient = new ApiClient()
                 .setHttpClientBuilder(http)
-                .setConnectTimeout(TRANSPORT_TIMEOUT)
-                .setReadTimeout(TRANSPORT_TIMEOUT);
+                .setConnectTimeout(HaConstants.TRANSPORT_TIMEOUT)
+                .setReadTimeout(HaConstants.TRANSPORT_TIMEOUT);
 
         apiClient.updateBaseUri(cfg.orchestratorBaseUri());
 
         apiClient.setRequestInterceptor(b -> {
-            String routeId = (String) MDC.get(MDC_ROUTE_ID);
-            if (routeId == null) routeId = UUID.randomUUID().toString();
-            b.header(AUTH_HEADER, cfg.apiKey());
-            b.header(REQUEST_ID_HEADER, routeId);
-            b.timeout(TRANSPORT_TIMEOUT);
+            String routeId = (String) MDC.get(HaConstants.MDC_ROUTE_ID);
+            if (routeId == null) routeId = UUID.randomUUID()
+                    .toString();
+            b.header(HaConstants.AUTH_HEADER, cfg.apiKey());
+            b.header(HaConstants.REQUEST_ID_HEADER, routeId);
+            b.timeout(HaConstants.TRANSPORT_TIMEOUT);
         });
 
         this.challengeApi = new ChallengeApi(apiClient);
@@ -79,63 +78,66 @@ public final class OrchClient {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Create Challenge Request", routeId);
-            ChallengeCreateRequest req = new ChallengeCreateRequest()
+            CreateChallengeRequestDto req = CreateChallengeRequestDto.builder()
                     .userId(userId)
-                    .ttlSeconds(challengeTtlSeconds);
+                    .ttlSeconds(challengeTtlSeconds)
+                    .build();
 
-            ChallengeCreateResponse resp = challengeApi.internalChallengeCreate(req);
+            CreateChallengeResponseDto resp = challengeApi.createChallenge(req);
             LOG.infof("routeId=%s Received Response to Challenge Create", routeId);
             return resp.getChallengeId();
         } finally {
-            MDC.remove(MDC_ROUTE_ID);
+            MDC.remove(HaConstants.MDC_ROUTE_ID);
         }
     }
 
 
-    public PairingCreateResponse createPairing(UUID userId) throws ApiException {
+    public CreatePairingResponseDto createPairing(UUID userId) throws ApiException {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Create Pairing Request", routeId);
-            PairingCreateRequest req = new PairingCreateRequest()
+            CreatePairingRequestDto req = CreatePairingRequestDto.builder()
                     .userId(userId)
-                    .ttlSeconds(pairingTtlSeconds);
+                    .ttlSeconds(pairingTtlSeconds)
+                    .build();
 
-            PairingCreateResponse resp = pairingApi.internalPairingCreate(req);
+            CreatePairingResponseDto resp = pairingApi.createPairing(req);
             LOG.infof("routeId=%s Received Response to Pairing Create", routeId);
             return resp;
         } finally {
-            MDC.remove(MDC_ROUTE_ID);
+            MDC.remove(HaConstants.MDC_ROUTE_ID);
         }
     }
 
-    public StatusResponse getChallengeStatus(UUID challengeId, String kcSession) throws ApiException {
+    public StatusResponseDto getChallengeStatus(UUID challengeId) throws ApiException {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Get Challenge Status Request", routeId);
-            StatusResponse resp = challengeApi.internalChallengeStatus(challengeId, kcSession);
+            StatusResponseDto resp = challengeApi.getChallengeStatus(challengeId);
             LOG.infof("routeId=%s Received Response to Challenge Status", routeId);
             return resp;
         } finally {
-            MDC.remove(MDC_ROUTE_ID);
+            MDC.remove(HaConstants.MDC_ROUTE_ID);
         }
     }
 
-    public StatusResponse getPairingStatus(UUID pairingId, String kcSession) throws ApiException {
+    public StatusResponseDto getPairingStatus(UUID pairingId) throws ApiException {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Get Pairing Status Request", routeId);
-            StatusResponse resp = pairingApi.internalPairingStatus(pairingId, kcSession);
+            StatusResponseDto resp = pairingApi.getPairingStatus(pairingId);
             LOG.infof("routeId=%s Received Response to Pairing Status", routeId);
             return resp;
         } finally {
-            MDC.remove(MDC_ROUTE_ID);
+            MDC.remove(HaConstants.MDC_ROUTE_ID);
         }
     }
 
 
     private static String createRouteId() {
-        String routeId = UUID.randomUUID().toString();
-        MDC.put(MDC_ROUTE_ID, routeId);
+        String routeId = UUID.randomUUID()
+                .toString();
+        MDC.put(HaConstants.MDC_ROUTE_ID, routeId);
         return routeId;
     }
 }

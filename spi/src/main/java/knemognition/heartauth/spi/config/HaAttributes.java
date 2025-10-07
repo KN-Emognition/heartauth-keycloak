@@ -1,4 +1,4 @@
-package knemognition.hauth.spi.config;
+package knemognition.heartauth.spi.config;
 
 public final class HaAttributes {
     private HaAttributes() {

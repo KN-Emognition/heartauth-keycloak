@@ -1,19 +1,18 @@
-package knemognition.hauth.spi.registerDevice;
+package knemognition.heartauth.spi.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import knemognition.hauth.orchestrator.invoker.ApiException;
-import knemognition.hauth.spi.gateway.OrchClient;
-import knemognition.hauth.spi.status.StatusWatchResourceProviderFactory;
-import knemognition.hauth.orchestrator.model.PairingCreateResponse;
+import knemognition.heartauth.orchestrator.ApiException;
+import knemognition.heartauth.orchestrator.model.CreatePairingResponseDto;
+import knemognition.heartauth.spi.gateway.OrchClient;
+import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.RequiredActionContext;
 import org.keycloak.authentication.RequiredActionProvider;
-import org.keycloak.models.*;
+import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
 import java.net.URI;
-import java.util.Objects;
 import java.util.UUID;
 
 public class RegisterDeviceRequiredAction implements RequiredActionProvider {
@@ -25,12 +24,6 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private static final String REG_PENDING = "hauthRegistrationPending";
     private static final String DEV_REGISTERED = "hauthDeviceRegistered";
-
-    private final KeycloakSession session;
-
-    public RegisterDeviceRequiredAction(KeycloakSession session) {
-        this.session = Objects.requireNonNull(session, "session");
-    }
 
     @Override
     public void evaluateTriggers(RequiredActionContext ctx) {
@@ -55,10 +48,12 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
             }
 
             OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
-            UUID userId = UUID.fromString(ctx.getUser().getId());
+            UUID userId = UUID.fromString(ctx.getUser()
+                    .getId());
 
-            PairingCreateResponse res = oc.createPairing(userId);
-            sess.setAuthNote(JTI, res.getJti().toString());
+            CreatePairingResponseDto res = oc.createPairing(userId);
+            sess.setAuthNote(JTI, res.getJti()
+                    .toString());
             sess.setAuthNote(JWT, res.getJwt());
 
             render(ctx);
@@ -66,19 +61,22 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         } catch (IllegalArgumentException iae) {
             LOG.error("RegisterDevice: missing/invalid realm attributes for JWT", iae);
             ctx.challenge(
-                    ctx.form().setError("Pairing is not configured. Missing secret.")
+                    ctx.form()
+                            .setError("Pairing is not configured. Missing secret.")
                             .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         } catch (ApiException e) {
             LOG.warn("RegisterDevice: orchestrator unavailable", e);
             ctx.challenge(
-                    ctx.form().setError("Upstream unavailable.")
+                    ctx.form()
+                            .setError("Upstream unavailable.")
                             .createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
             LOG.error("RegisterDevice: unexpected error", e);
             ctx.challenge(
-                    ctx.form().setError("Unexpected error while rendering QR.")
+                    ctx.form()
+                            .setError("Unexpected error while rendering QR.")
                             .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
@@ -89,15 +87,15 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
         String jtiStr = as.getAuthNote(JTI);
         if (jtiStr == null || jtiStr.isBlank()) {
-            ctx.challenge(ctx.form().setError("Missing token.")
+            ctx.challenge(ctx.form()
+                    .setError("Missing token.")
                     .createErrorPage(Status.INTERNAL_SERVER_ERROR));
             return;
         }
 
         try {
             OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
-            String kcSessionId = as.getParentSession().getId();
-            var st = oc.getPairingStatus(UUID.fromString(jtiStr), kcSessionId);
+            var st = oc.getPairingStatus(UUID.fromString(jtiStr));
 
             switch (st.getStatus()) {
                 case APPROVED -> {
@@ -111,12 +109,14 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
                     if (isPendingRegistration(ctx.getUser())) {
                         deleteUser(ctx);
                         ctx.challenge(
-                                ctx.form().setError("Registration failed: device not registered.")
+                                ctx.form()
+                                        .setError("Registration failed: device not registered.")
                                         .createErrorPage(Status.UNAUTHORIZED)
                         );
                     } else {
                         ctx.challenge(
-                                ctx.form().setError("Device registration failed.")
+                                ctx.form()
+                                        .setError("Device registration failed.")
                                         .createErrorPage(Status.UNAUTHORIZED)
                         );
                     }
@@ -125,13 +125,15 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
             }
         } catch (ApiException e) {
             ctx.challenge(
-                    ctx.form().setError("Upstream unavailable.")
+                    ctx.form()
+                            .setError("Upstream unavailable.")
                             .createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
             LOG.error("RegisterDevice: unexpected in processAction()", e);
             ctx.challenge(
-                    ctx.form().setError("Unexpected error.")
+                    ctx.form()
+                            .setError("Unexpected error.")
                             .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
@@ -147,10 +149,13 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         String jti = as.getAuthNote(JTI);
         String jwt = as.getAuthNote(JWT);
 
-        URI watchBase = ctx.getSession().getContext().getUri()
+        URI watchBase = ctx.getSession()
+                .getContext()
+                .getUri()
                 .getBaseUriBuilder()
                 .path("realms")
-                .path(ctx.getRealm().getName())
+                .path(ctx.getRealm()
+                        .getName())
                 .path(StatusWatchResourceProviderFactory.ID)
                 .path("watch")
                 .path("pairing")
@@ -159,7 +164,8 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         Response page = ctx.form()
                 .setAttribute("qr", jwt)
                 .setAttribute("id", jti)
-                .setAttribute("rootAuthSessionId", as.getParentSession().getId())
+                .setAttribute("rootAuthSessionId", as.getParentSession()
+                        .getId())
                 .setAttribute("tabId", as.getTabId())
                 .setAttribute("watchBase", watchBase.toString())
                 .createForm("registerDevice.ftl");
@@ -182,9 +188,11 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private void deleteUser(RequiredActionContext ctx) {
         var realm = ctx.getRealm();
-        var user  = ctx.getUser();
-        var id    = user.getId();
-        ctx.getSession().users().removeUser(realm, user);
+        var user = ctx.getUser();
+        var id = user.getId();
+        ctx.getSession()
+                .users()
+                .removeUser(realm, user);
         LOG.infof("Deleted user %s due to failed device registration", id);
     }
 

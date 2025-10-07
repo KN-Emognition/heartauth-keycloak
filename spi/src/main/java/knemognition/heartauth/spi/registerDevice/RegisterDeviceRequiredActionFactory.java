@@ -1,4 +1,4 @@
-package knemognition.hauth.spi.registerDevice;
+package knemognition.heartauth.spi.registerDevice;
 
 import org.keycloak.Config;
 import org.keycloak.authentication.RequiredActionFactory;
@@ -22,7 +22,7 @@ public class RegisterDeviceRequiredActionFactory implements RequiredActionFactor
 
     @Override
     public RequiredActionProvider create(KeycloakSession session) {
-        return new RegisterDeviceRequiredAction(session);
+        return new RegisterDeviceRequiredAction();
     }
 
     @Override

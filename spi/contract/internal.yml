@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Heartauth Orchestrator - internal API
+  version: 1.0.0
+  description: |
+    Internal endpoints used by Heartauth tenants to create/poll device pairings and login-time ECG challenges.
+    ### Conventions
+    - All timestamps are UTC unless stated otherwise.
+    - Ids are UUID v4 strings.
+    - Short-lived resources (pairings/challenges) may expire; polling endpoints indicate current status.
+
+tags:
+  - name: Pairing
+    description: Create and poll device pairing flows (connect userId with theirs device).
+  - name: Challenge
+    description: Create and poll login-time ECG challenges.
+paths:
+  /internal/v1/pairing:
+    post:
+      operationId: createPairing
+      tags:
+        - Pairing
+      description: |
+        Creates a short-lived pairing flow for a given `userId`. Returns a `jti` (pairing id) and a signed `jwt`
+        that the mobile app uses to link the device.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePairingRequest'
+            examples:
+              default:
+                summary: Minimal
+                value:
+                  userId: "8d8a4b2e-1a56-4a3a-8c08-9c3c5a2d5c01"
+                  ttlSeconds: 120
+      responses:
+        '201':
+          description: |
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatePairingResponse'
+              examples:
+                default:
+                  value:
+                    jti: "6b0a2a75-8d21-4e64-9a9b-3b9d1d3f9e1a"
+                    jwt: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+  /internal/v1/pairing/status/{jti}:
+    get:
+      operationId: getPairingStatus
+      tags:
+        - Pairing
+      summary: Poll current pairing status.
+      description: |
+        Keycloak Required Action (or app-side page) checks if the device has been linked or the challenge has expired.
+      parameters:
+        - $ref: '#/components/parameters/JtiParam'
+      responses:
+        '200':
+          description: Current state of the pairing operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+  /internal/v1/challenge:
+    post:
+      operationId: createChallenge
+      tags:
+        - Challenge
+      summary: Create a login-time ECG challenge and dispatch FCM push.
+      description: |
+        Called by the Keycloak Authenticator. Creates a short-lived challenge, sends an FCM data message
+        to the user’s registered device(s), and returns challenge metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChallengeRequest'
+            examples:
+              default:
+                value:
+                  userId: "8d8a4b2e-1a56-4a3a-8c08-9c3c5a2d5c01"
+                  ttlSeconds: 120
+      responses:
+        '201':
+          description: Challenge created and push dispatched.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateChallengeResponse'
+              examples:
+                default:
+                  value:
+                    challengeId: "c2a4f2a1-5e1e-4a6d-8b7c-1f7e5fd3c2a1"
+  /internal/v1/challenge/status/{id}:
+    get:
+      operationId: getChallengeStatus
+      tags:
+        - Challenge
+      summary: Poll challenge status.
+      description: |
+        Used by the Keycloak login page to display live progress.
+      parameters:
+        - $ref: '#/components/parameters/ChallengeIdParam'
+      responses:
+        '200':
+          description: Current state of the challenge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+              examples:
+                awaiting:
+                  value:
+                    status: "PENDING"
+                    reason: null
+components:
+  parameters:
+    JtiParam:
+      name: jti
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChallengeIdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    CreatePairingRequest:
+      type: object
+      required: [ userId ]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Unique id of the user initiating pairing.
+          example: 8d8a4b2e-1a56-4a3a-8c08-9c3c5a2d5c01
+        ttlSeconds:
+          type: integer
+          minimum: 30
+          maximum: 300
+          default: 120
+          description: Time-to-live for the pairing flow.
+    CreatePairingResponse:
+      type: object
+      required:
+        - jti
+        - jwt
+      properties:
+        jti:
+          type: string
+          format: uuid
+          description: Pairing flow id to poll with.
+          example: 6b0a2a75-8d21-4e64-9a9b-3b9d1d3f9e1a
+        jwt:
+          type: string
+          description: Signed token consumed by the mobile app to link this device.
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+    CreateChallengeRequest:
+      type: object
+      required:
+        - userId
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: User id to challenge at login.
+          example: 8d8a4b2e-1a56-4a3a-8c08-9c3c5a2d5c01
+        ttlSeconds:
+          type: integer
+          minimum: 30
+          maximum: 300
+          default: 120
+          description: Time-to-live for the challenge.
+    CreateChallengeResponse:
+      type: object
+      required:
+        - challengeId
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+          description: Id used to poll challenge status.
+          example: c2a4f2a1-5e1e-4a6d-8b7c-1f7e5fd3c2a1
+    StatusResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: '#/components/schemas/FlowStatus'
+        reason:
+          type: string
+          description: Optional human-readable reason for non-success states (e.g., "TTL exceeded", "User denied").
+          example: "User denied on device"
+    FlowStatus:
+      type: string
+      description: Lifecycle state of a pairing/challenge flow.
+      enum: [ CREATED, PENDING, APPROVED, DENIED, EXPIRED, NOT_FOUND ]

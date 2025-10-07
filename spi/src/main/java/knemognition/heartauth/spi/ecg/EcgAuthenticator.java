@@ -1,11 +1,11 @@
-package knemognition.hauth.spi.ecg;
+package knemognition.heartauth.spi.ecg;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import knemognition.hauth.spi.gateway.OrchClient;
-import knemognition.hauth.spi.status.StatusWatchResourceProviderFactory;
-import knemognition.hauth.orchestrator.invoker.ApiException;
-import knemognition.hauth.orchestrator.model.StatusResponse;
+import knemognition.heartauth.orchestrator.ApiException;
+import knemognition.heartauth.orchestrator.model.StatusResponseDto;
+import knemognition.heartauth.spi.gateway.OrchClient;
+import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
 import org.keycloak.authentication.AuthenticationFlowError;
@@ -27,10 +27,13 @@ public class EcgAuthenticator implements Authenticator {
     private void render(AuthenticationFlowContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
         String idStr = as.getAuthNote(CHALLENGE_ID);
-        URI watchBase = ctx.getSession().getContext().getUri()
+        URI watchBase = ctx.getSession()
+                .getContext()
+                .getUri()
                 .getBaseUriBuilder()
                 .path("realms")
-                .path(ctx.getRealm().getName())
+                .path(ctx.getRealm()
+                        .getName())
                 .path(StatusWatchResourceProviderFactory.ID)
                 .path("watch")
                 .path("ecg")
@@ -38,7 +41,8 @@ public class EcgAuthenticator implements Authenticator {
 
         Response page = ctx.form()
                 .setAttribute("id", idStr)
-                .setAttribute("rootAuthSessionId", as.getParentSession().getId())
+                .setAttribute("rootAuthSessionId", as.getParentSession()
+                        .getId())
                 .setAttribute("tabId", as.getTabId())
                 .setAttribute("watchBase", watchBase.toString())
                 .createForm("ecg.ftl");
@@ -77,33 +81,39 @@ public class EcgAuthenticator implements Authenticator {
             LOG.warn("ECG orchestrator call failed", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE)
+                    ctx.form()
+                            .setError("Upstream unavailable")
+                            .createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
             LOG.error("ECG unexpected error", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Unexpected error").createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                    ctx.form()
+                            .setError("Unexpected error")
+                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
     }
 
     @Override
     public void action(AuthenticationFlowContext ctx) {
-        String idStr = ctx.getAuthenticationSession().getAuthNote(CHALLENGE_ID);
+        String idStr = ctx.getAuthenticationSession()
+                .getAuthNote(CHALLENGE_ID);
         if (idStr == null || idStr.isBlank()) {
             ctx.failureChallenge(
                     AuthenticationFlowError.EXPIRED_CODE,
-                    ctx.form().setError("Challenge not found").createErrorPage(Status.UNAUTHORIZED)
+                    ctx.form()
+                            .setError("Challenge not found")
+                            .createErrorPage(Status.UNAUTHORIZED)
             );
             return;
         }
 
         UUID id = UUID.fromString(idStr);
         try {
-            String kcSession = ctx.getAuthenticationSession().getParentSession().getId();
             OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
-            StatusResponse status = orchestrator.getChallengeStatus(id, kcSession);
+            StatusResponseDto status = orchestrator.getChallengeStatus(id);
 
             switch (status.getStatus()) {
                 case APPROVED -> {
@@ -123,7 +133,9 @@ public class EcgAuthenticator implements Authenticator {
                     clearNotes(ctx.getAuthenticationSession());
                     ctx.failureChallenge(
                             AuthenticationFlowError.EXPIRED_CODE,
-                            ctx.form().setError("Challenge expired").createErrorPage(Status.UNAUTHORIZED)
+                            ctx.form()
+                                    .setError("Challenge expired")
+                                    .createErrorPage(Status.UNAUTHORIZED)
                     );
                 }
                 default -> render(ctx);
@@ -132,19 +144,36 @@ public class EcgAuthenticator implements Authenticator {
             LOG.warn("ECG status check failed", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Upstream unavailable").createErrorPage(Status.SERVICE_UNAVAILABLE)
+                    ctx.form()
+                            .setError("Upstream unavailable")
+                            .createErrorPage(Status.SERVICE_UNAVAILABLE)
             );
         } catch (Exception e) {
             LOG.error("ECG unexpected in action()", e);
             ctx.failureChallenge(
                     AuthenticationFlowError.INTERNAL_ERROR,
-                    ctx.form().setError("Unexpected error").createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                    ctx.form()
+                            .setError("Unexpected error")
+                            .createErrorPage(Status.INTERNAL_SERVER_ERROR)
             );
         }
     }
 
-    @Override public boolean requiresUser() { return true; }
-    @Override public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) { return true; }
-    @Override public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) { }
-    @Override public void close() { }
+    @Override
+    public boolean requiresUser() {
+        return true;
+    }
+
+    @Override
+    public boolean configuredFor(KeycloakSession s, RealmModel r, UserModel u) {
+        return true;
+    }
+
+    @Override
+    public void setRequiredActions(KeycloakSession s, RealmModel r, UserModel u) {
+    }
+
+    @Override
+    public void close() {
+    }
 }

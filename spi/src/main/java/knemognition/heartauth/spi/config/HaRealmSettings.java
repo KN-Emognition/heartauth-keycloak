@@ -1,4 +1,4 @@
-package knemognition.hauth.spi.config;
+package knemognition.heartauth.spi.config;
 
 import org.keycloak.models.RealmModel;
 
