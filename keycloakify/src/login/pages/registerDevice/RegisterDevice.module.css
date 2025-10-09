@@ -12,3 +12,12 @@
     width: 100%;
 }
 
+.actions {
+    margin-top: 24px;
+    display: flex;
+    justify-content: center;
+}
+
+.actions button {
+    min-width: 220px;
+}

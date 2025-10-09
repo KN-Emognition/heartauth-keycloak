@@ -35,6 +35,14 @@
 
 .ecgLinkRestart { text-decoration: underline; }
 
+.resendForm {
+  margin-top: 8px;
+}
+
+.resendForm button {
+  min-width: 220px;
+}
+
 /* WAŻNE: to są klasy globalne PatternFly – musisz użyć :global(...) */
 :global(.pf-c-alert) {
   width: 100%;

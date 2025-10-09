@@ -2,6 +2,7 @@ package knemognition.heartauth.spi.ecg;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
+import jakarta.ws.rs.core.MultivaluedMap;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
 import knemognition.heartauth.spi.gateway.OrchClient;
@@ -23,6 +24,13 @@ public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
     private static final String CHALLENGE_ID = "ecg.challengeId";
 
+    private void requestNewChallenge(AuthenticationFlowContext ctx) throws ApiException {
+        AuthenticationSessionModel sess = ctx.getAuthenticationSession();
+        OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
+        UUID userId = parseUserId(ctx.getUser());
+        UUID challengeId = orchestrator.createChallenge(userId);
+        sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
+    }
 
     private void render(AuthenticationFlowContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
@@ -69,12 +77,7 @@ public class EcgAuthenticator implements Authenticator {
                 return;
             }
 
-            OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
-            UUID userId = parseUserId(ctx.getUser());
-
-            UUID challengeId = orchestrator.createChallenge(userId);
-            sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
-
+            requestNewChallenge(ctx);
             render(ctx);
 
         } catch (ApiException e) {
@@ -98,6 +101,34 @@ public class EcgAuthenticator implements Authenticator {
 
     @Override
     public void action(AuthenticationFlowContext ctx) {
+        MultivaluedMap<String, String> formParams = ctx.getHttpRequest()
+                .getDecodedFormParameters();
+        if (formParams != null && "true".equalsIgnoreCase(formParams.getFirst("resend"))) {
+            try {
+                requestNewChallenge(ctx);
+                render(ctx);
+                return;
+            } catch (ApiException e) {
+                LOG.warn("ECG resend orchestrator call failed", e);
+                ctx.failureChallenge(
+                        AuthenticationFlowError.INTERNAL_ERROR,
+                        ctx.form()
+                                .setError("Upstream unavailable")
+                                .createErrorPage(Status.SERVICE_UNAVAILABLE)
+                );
+                return;
+            } catch (Exception e) {
+                LOG.error("ECG unexpected error during resend", e);
+                ctx.failureChallenge(
+                        AuthenticationFlowError.INTERNAL_ERROR,
+                        ctx.form()
+                                .setError("Unexpected error")
+                                .createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                );
+                return;
+            }
+        }
+
         String idStr = ctx.getAuthenticationSession()
                 .getAuthNote(CHALLENGE_ID);
         if (idStr == null || idStr.isBlank()) {

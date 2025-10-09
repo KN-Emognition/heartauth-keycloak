@@ -10,30 +10,29 @@ import useStatus from "../../../hooks/useStatus";
 
 type Props = PageProps<Extract<KcContext, { pageId: "ecg.ftl" }>, I18n>;
 
-const TERMINAL: readonly FlowStatus[] = [
-    "APPROVED",
-    "DENIED",
-    "EXPIRED",
-    "NOT_FOUND"
-] as const;
-
 export default function LoginEcg(props: Props) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
     const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
     const { url, id, rootAuthSessionId, tabId, watchBase } = kcContext;
 
     const [status, setStatus] = useState<FlowStatus>("PENDING");
-    const isTerminal = TERMINAL.includes(status);
+    const isApproved = status === "APPROVED";
+    const resendDisabled = status === "APPROVED";
 
     const finalizeFormRef = useRef<HTMLFormElement>(null);
     const submittedRef = useRef(false);
 
     useEffect(() => {
-        if (isTerminal && !submittedRef.current) {
+        setStatus("PENDING");
+        submittedRef.current = false;
+    }, [id]);
+
+    useEffect(() => {
+        if (isApproved && !submittedRef.current) {
             submittedRef.current = true;
             finalizeFormRef.current?.submit();
         }
-    }, [isTerminal]);
+    }, [isApproved]);
 
     useStatus({
         setStatus,
@@ -48,14 +47,14 @@ export default function LoginEcg(props: Props) {
             case "APPROVED":
                 return "Continuing your sign-in…";
             case "DENIED":
-                return "Request was denied. Finishing up…";
+                return "Request was denied. You can send a new request below.";
             case "EXPIRED":
             case "NOT_FOUND":
-                return "Request is no longer valid. Finishing up…";
+                return "Request is no longer valid. Send a new request below.";
             case "CREATED":
             case "PENDING":
             default:
-                return "Approve the request in your HeartAuth app. We’ll continue automatically.";
+                return "Approve the request in your HeartAuth app or resend a new one below. We’ll continue automatically.";
         }
     }, [status]);
 
@@ -85,6 +84,20 @@ export default function LoginEcg(props: Props) {
             <div className={styles.ecgPanel}>
                 <InfoBox hint={hint} type={alertType} />
                 <InfoBox hint={`Challenge ID: ${id}`} type="warning" />
+                <form
+                    method="post"
+                    action={url.loginAction}
+                    className={styles.resendForm}
+                >
+                    <input type="hidden" name="resend" value="true" />
+                    <button
+                        type="submit"
+                        className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
+                        disabled={resendDisabled}
+                    >
+                        Send a new authentication request
+                    </button>
+                </form>
             </div>
             <form
                 ref={finalizeFormRef}

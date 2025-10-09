@@ -2,6 +2,7 @@ package knemognition.heartauth.spi.registerDevice;
 
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
+import jakarta.ws.rs.core.MultivaluedMap;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.CreatePairingResponseDto;
 import knemognition.heartauth.spi.gateway.OrchClient;
@@ -25,6 +26,18 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
     private static final String REG_PENDING = "hauthRegistrationPending";
     private static final String DEV_REGISTERED = "hauthDeviceRegistered";
 
+    private void requestNewPairing(RequiredActionContext ctx) throws ApiException {
+        AuthenticationSessionModel sess = ctx.getAuthenticationSession();
+        OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
+        UUID userId = UUID.fromString(ctx.getUser()
+                .getId());
+
+        CreatePairingResponseDto res = oc.createPairing(userId);
+        sess.setAuthNote(JTI, res.getJti()
+                .toString());
+        sess.setAuthNote(JWT, res.getJwt());
+    }
+
     @Override
     public void evaluateTriggers(RequiredActionContext ctx) {
         UserModel user = ctx.getUser();
@@ -47,15 +60,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
                 return;
             }
 
-            OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
-            UUID userId = UUID.fromString(ctx.getUser()
-                    .getId());
-
-            CreatePairingResponseDto res = oc.createPairing(userId);
-            sess.setAuthNote(JTI, res.getJti()
-                    .toString());
-            sess.setAuthNote(JWT, res.getJwt());
-
+            requestNewPairing(ctx);
             render(ctx);
 
         } catch (IllegalArgumentException iae) {
@@ -84,6 +89,40 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     @Override
     public void processAction(RequiredActionContext ctx) {
+        MultivaluedMap<String, String> formParams = ctx.getHttpRequest()
+                .getDecodedFormParameters();
+        if (formParams != null && "true".equalsIgnoreCase(formParams.getFirst("resend"))) {
+            try {
+                requestNewPairing(ctx);
+                render(ctx);
+                return;
+            } catch (IllegalArgumentException iae) {
+                LOG.error("RegisterDevice: missing/invalid realm attributes for JWT on resend", iae);
+                ctx.challenge(
+                        ctx.form()
+                                .setError("Pairing is not configured. Missing secret.")
+                                .createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                );
+                return;
+            } catch (ApiException e) {
+                LOG.warn("RegisterDevice: orchestrator unavailable on resend", e);
+                ctx.challenge(
+                        ctx.form()
+                                .setError("Upstream unavailable.")
+                                .createErrorPage(Status.SERVICE_UNAVAILABLE)
+                );
+                return;
+            } catch (Exception e) {
+                LOG.error("RegisterDevice: unexpected error during resend", e);
+                ctx.challenge(
+                        ctx.form()
+                                .setError("Unexpected error while rendering QR.")
+                                .createErrorPage(Status.INTERNAL_SERVER_ERROR)
+                );
+                return;
+            }
+        }
+
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
         String jtiStr = as.getAuthNote(JTI);
         if (jtiStr == null || jtiStr.isBlank()) {

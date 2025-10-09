@@ -12,13 +12,6 @@ import type { FlowStatus } from "../../../types/FlowStatus";
 
 type Props = PageProps<Extract<KcContext, { pageId: "registerDevice.ftl" }>, I18n>;
 
-const TERMINAL: readonly FlowStatus[] = [
-    "APPROVED",
-    "DENIED",
-    "EXPIRED",
-    "NOT_FOUND"
-] as const;
-
 export default function RegisterDevice(props: Props) {
     const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
     const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
@@ -26,7 +19,8 @@ export default function RegisterDevice(props: Props) {
     const { url, qr, id, rootAuthSessionId, tabId, watchBase } = kcContext;
 
     const [status, setStatus] = useState<FlowStatus>("PENDING");
-    const isTerminal = TERMINAL.includes(status);
+    const isApproved = status === "APPROVED";
+    const resendDisabled = status === "APPROVED";
 
     const finalizeFormRef = useRef<HTMLFormElement>(null);
     const submittedRef = useRef(false);
@@ -34,11 +28,16 @@ export default function RegisterDevice(props: Props) {
     useStatus({ setStatus, id, rootAuthSessionId, tabId, watchBase });
 
     useEffect(() => {
-        if (isTerminal && !submittedRef.current) {
+        setStatus("PENDING");
+        submittedRef.current = false;
+    }, [id]);
+
+    useEffect(() => {
+        if (isApproved && !submittedRef.current) {
             submittedRef.current = true;
             finalizeFormRef.current?.submit();
         }
-    }, [isTerminal]);
+    }, [isApproved]);
 
     const hint = useMemo(() => {
         switch (status) {
@@ -95,6 +94,21 @@ export default function RegisterDevice(props: Props) {
                 <InfoBox hint={hint} type={alertType} />
                 <InfoBox hint={qr} type={alertType} />
             </div>
+
+            <form
+                method="post"
+                action={url.loginAction}
+                className={styles.actions}
+            >
+                <input type="hidden" name="resend" value="true" />
+                <button
+                    type="submit"
+                    className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
+                    disabled={resendDisabled}
+                >
+                    {labels.resend ?? "Send a new pairing request"}
+                </button>
+            </form>
 
             <form
                 ref={finalizeFormRef}
