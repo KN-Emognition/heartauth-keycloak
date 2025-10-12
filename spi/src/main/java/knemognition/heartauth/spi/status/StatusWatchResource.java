@@ -1,5 +1,6 @@
 package knemognition.heartauth.spi.status;
 
+import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -39,6 +40,7 @@ public class StatusWatchResource {
     @GET
     @Path("watch/ecg")
     @Produces(MediaType.SERVER_SENT_EVENTS)
+    @ActivateRequestContext
     public void watchEcg(@QueryParam("root") String rootId,
                          @QueryParam("tab") String tabId,
                          @QueryParam("id") String challengeIdStr,
@@ -60,6 +62,7 @@ public class StatusWatchResource {
     @GET
     @Path("watch/pairing")
     @Produces(MediaType.SERVER_SENT_EVENTS)
+    @ActivateRequestContext
     public void watchPairing(@QueryParam("root") String rootId,
                              @QueryParam("tab") String tabId,
                              @QueryParam("id") String pairingIdStr,

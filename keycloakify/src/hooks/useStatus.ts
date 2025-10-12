@@ -17,6 +17,9 @@ interface Props {
     setStatus: (status: FlowStatus) => void;
 }
 
+const RETRY_BASE_DELAY = 1500;
+const RETRY_MAX_DELAY = 8000;
+
 const useStatus = ({
     id: challengeId,
     rootAuthSessionId,
@@ -35,20 +38,50 @@ const useStatus = ({
         const watchUrl = `${watchBase}?${params.toString()}`;
 
         let eventSource: EventSource | undefined;
+        let stopped = false;
+        let retryDelay = RETRY_BASE_DELAY;
+
+        const clearSource = () => {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = undefined;
+            }
+        };
+
+        const stop = () => {
+            stopped = true;
+            clearSource();
+        };
+
+        const scheduleReconnect = () => {
+            if (stopped) return;
+            const delay = retryDelay;
+            retryDelay = Math.min(retryDelay * 2, RETRY_MAX_DELAY);
+            window.setTimeout(() => {
+                if (!stopped) start();
+            }, delay);
+        };
 
         const handle = (p: StatusResponse | undefined) => {
             const st = (p?.status as FlowStatus) ?? "PENDING";
             setStatus(st);
             if (TERMINAL.includes(st)) {
-                eventSource?.close();
+                stop();
             }
         };
 
         const start = () => {
+            if (stopped) return;
+            clearSource();
             try {
-                eventSource = new EventSource(watchUrl);
+                const source = new EventSource(watchUrl);
+                eventSource = source;
 
-                eventSource.onmessage = event => {
+                source.onopen = () => {
+                    retryDelay = RETRY_BASE_DELAY;
+                };
+
+                source.onmessage = event => {
                     try {
                         const payload =
                             typeof event.data === "string"
@@ -56,31 +89,23 @@ const useStatus = ({
                                 : (event.data as StatusResponse);
                         handle(payload);
                     } catch {
-                        // If bad payload, keep connection but default to PENDING
+                        // Default to PENDING when payload cannot be parsed.
                         handle({ status: "PENDING" } as StatusResponse);
                     }
                 };
 
-                eventSource.onerror = () => {
-                    eventSource?.close();
-                    setTimeout(() => {
-                        if (eventSource && (eventSource as any).readyState === 2) {
-                            start();
-                        } else {
-                            start();
-                        }
-                    }, 1500);
+                source.onerror = () => {
+                    clearSource();
+                    scheduleReconnect();
                 };
             } catch {
-                setTimeout(start, 1500);
+                scheduleReconnect();
             }
         };
 
         start();
 
-        return () => {
-            eventSource?.close();
-        };
+        return stop;
     }, [challengeId, rootAuthSessionId, tabId, watchBase, setStatus]);
 };
 
