@@ -10,6 +10,7 @@ import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.CreatePairingResponseDto;
 import knemognition.heartauth.spi.config.HaSessionNotes;
 import knemognition.heartauth.spi.gateway.OrchClient;
+import knemognition.heartauth.spi.status.StatusWatchRegistry;
 import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.RequiredActionContext;
@@ -28,6 +29,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private void requestNewPairing(RequiredActionContext ctx) throws ApiException {
         AuthenticationSessionModel sess = ctx.getAuthenticationSession();
+        closeActivePairingWatch(sess);
         OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
         UUID userId = UUID.fromString(ctx.getUser()
                 .getId());
@@ -58,6 +60,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
             String existingJti = sess.getAuthNote(HaSessionNotes.PAIRING_JTI);
             String existingJwt = sess.getAuthNote(HaSessionNotes.PAIRING_JWT);
             if (existingJti != null && !existingJti.isBlank() && existingJwt != null) {
+                closeActivePairingWatch(sess);
                 render(ctx);
                 return;
             }
@@ -216,6 +219,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
     }
 
     private static void clearNotes(AuthenticationSessionModel s) {
+        closeActivePairingWatch(s);
         s.removeAuthNote(HaSessionNotes.PAIRING_JTI);
         s.removeAuthNote(HaSessionNotes.PAIRING_JWT);
     }
@@ -255,6 +259,17 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         if (!isPendingRegistration(user)) {
             user.setSingleAttribute(REG_PENDING, "true");
         }
+    }
+
+    private static void closeActivePairingWatch(AuthenticationSessionModel session) {
+        if (session == null) {
+            return;
+        }
+        String pairingId = session.getAuthNote(HaSessionNotes.PAIRING_JTI);
+        if (pairingId == null || pairingId.isBlank()) {
+            return;
+        }
+        StatusWatchRegistry.closePairing(session, pairingId);
     }
 
     private void preparePostRegistrationRedirect(RequiredActionContext ctx) {

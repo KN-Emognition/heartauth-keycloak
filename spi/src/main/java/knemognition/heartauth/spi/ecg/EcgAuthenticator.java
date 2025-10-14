@@ -6,6 +6,7 @@ import jakarta.ws.rs.core.MultivaluedMap;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
 import knemognition.heartauth.spi.gateway.OrchClient;
+import knemognition.heartauth.spi.status.StatusWatchRegistry;
 import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -27,6 +28,7 @@ public class EcgAuthenticator implements Authenticator {
 
     private void requestNewChallenge(AuthenticationFlowContext ctx) throws ApiException {
         AuthenticationSessionModel sess = ctx.getAuthenticationSession();
+        closeActiveEcgWatch(sess);
         OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
         UUID userId = parseUserId(ctx.getUser());
         UUID challengeId = orchestrator.createChallenge(userId);
@@ -64,6 +66,7 @@ public class EcgAuthenticator implements Authenticator {
     }
 
     private static void clearNotes(AuthenticationSessionModel s) {
+        closeActiveEcgWatch(s);
         s.removeAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
     }
 
@@ -74,6 +77,7 @@ public class EcgAuthenticator implements Authenticator {
 
             String existing = sess.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
             if (existing != null && !existing.isBlank()) {
+                closeActiveEcgWatch(sess);
                 render(ctx);
                 return;
             }
@@ -207,5 +211,16 @@ public class EcgAuthenticator implements Authenticator {
 
     @Override
     public void close() {
+    }
+
+    private static void closeActiveEcgWatch(AuthenticationSessionModel session) {
+        if (session == null) {
+            return;
+        }
+        String challengeId = session.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
+        if (challengeId == null || challengeId.isBlank()) {
+            return;
+        }
+        StatusWatchRegistry.closeEcg(session, challengeId);
     }
 }
