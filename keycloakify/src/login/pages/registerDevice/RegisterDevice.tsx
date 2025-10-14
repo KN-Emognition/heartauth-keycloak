@@ -1,22 +1,23 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import type { PageProps } from "keycloakify/login/pages/PageProps";
-import { getKcClsx } from "keycloakify/login/lib/kcClsx";
+import {useEffect, useMemo, useRef, useState} from "react";
+import type {PageProps} from "keycloakify/login/pages/PageProps";
+import {getKcClsx} from "keycloakify/login/lib/kcClsx";
 import styles from "./RegisterDevice.module.css";
-import type { KcContext } from "../../../kc.gen";
-import { I18n } from "keycloakify/login/i18n";
+import type {KcContext} from "../../../kc.gen";
+import {I18n} from "keycloakify/login/i18n";
 import labels from "./labels.json";
 import QRCode from "react-qr-code";
 import InfoBox from "../../../components/InfoBox/InfoBox";
 import useStatus from "../../../hooks/useStatus";
-import type { FlowStatus } from "../../../types/FlowStatus";
+import type {FlowStatus} from "../../../types/FlowStatus";
+import useCopyToClipboard from "../../../hooks/useCopyToClipboard.ts";
 
 type Props = PageProps<Extract<KcContext, { pageId: "registerDevice.ftl" }>, I18n>;
 
 export default function RegisterDevice(props: Props) {
-    const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
-    const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
+    const {kcContext, i18n, doUseDefaultCss, Template, classes} = props;
+    const {kcClsx} = getKcClsx({doUseDefaultCss, classes});
 
-    const { url, qr, id, rootAuthSessionId, tabId, watchBase } = kcContext;
+    const {url, qr, id, rootAuthSessionId, tabId, watchBase} = kcContext;
 
     const [status, setStatus] = useState<FlowStatus>("PENDING");
     const isApproved = status === "APPROVED";
@@ -25,8 +26,9 @@ export default function RegisterDevice(props: Props) {
     const finalizeFormRef = useRef<HTMLFormElement>(null);
     const submittedRef = useRef(false);
 
-    useStatus({ setStatus, id, rootAuthSessionId, tabId, watchBase });
+    useStatus({setStatus, id, rootAuthSessionId, tabId, watchBase});
 
+    const {handleCopy} = useCopyToClipboard()
     useEffect(() => {
         setStatus("PENDING");
         submittedRef.current = false;
@@ -82,17 +84,17 @@ export default function RegisterDevice(props: Props) {
             doUseDefaultCss={doUseDefaultCss}
             classes={classes}
             displayInfo={false}
-            headerNode={<Title />}
+            headerNode={<Title/>}
         >
             <div className={styles.panel} aria-live="polite">
                 {qr && (
                     <QRCode
-                        style={{ height: "auto", width: "80%" }}
+                        style={{height: "auto", width: "80%", maxWidth: 250}}
                         value={qr}
+                        onClick={handleCopy(qr)}
                     />
                 )}
-                <InfoBox hint={hint} type={alertType} />
-                <InfoBox hint={qr} type={alertType} />
+                <InfoBox hint={hint} type={alertType}/>
             </div>
 
             <form
@@ -100,7 +102,7 @@ export default function RegisterDevice(props: Props) {
                 action={url.loginAction}
                 className={styles.actions}
             >
-                <input type="hidden" name="resend" value="true" />
+                <input type="hidden" name="resend" value="true"/>
                 <button
                     type="submit"
                     className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
@@ -114,7 +116,7 @@ export default function RegisterDevice(props: Props) {
                 ref={finalizeFormRef}
                 method="post"
                 action={url.loginAction}
-                style={{ display: "none" }}
+                style={{display: "none"}}
             />
         </Template>
     );

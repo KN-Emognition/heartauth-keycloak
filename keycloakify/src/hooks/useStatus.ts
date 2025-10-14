@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { FlowStatus } from "../types/FlowStatus";
-import { StatusResponse } from "../types/StatusReponse";
+import {useEffect} from "react";
+import {FlowStatus} from "../types/FlowStatus";
+import {StatusResponse} from "../types/StatusReponse";
 
 const TERMINAL: readonly FlowStatus[] = [
     "APPROVED",
@@ -20,14 +20,15 @@ interface Props {
 const RETRY_BASE_DELAY = 1500;
 const RETRY_MAX_DELAY = 8000;
 
-const useStatus = ({
-    id: challengeId,
-    rootAuthSessionId,
-    tabId,
-    watchBase,
-    setStatus
-}: Props) => {
+export default ({
+                    id: challengeId,
+                    rootAuthSessionId,
+                    tabId,
+                    watchBase,
+                    setStatus
+                }: Props) => {
     useEffect(() => {
+        if (typeof window === "undefined") return;
         if (!watchBase || !rootAuthSessionId || !tabId || !challengeId) return;
 
         const params = new URLSearchParams({
@@ -36,10 +37,13 @@ const useStatus = ({
             id: challengeId
         });
         const watchUrl = `${watchBase}?${params.toString()}`;
+        const closeUrl = `${watchBase}/close?${params.toString()}`;
 
         let eventSource: EventSource | undefined;
         let stopped = false;
         let retryDelay = RETRY_BASE_DELAY;
+        let started = false;
+        let closeNotified = false;
 
         const clearSource = () => {
             if (eventSource) {
@@ -51,6 +55,26 @@ const useStatus = ({
         const stop = () => {
             stopped = true;
             clearSource();
+            notifyServerClose();
+        };
+
+        const notifyServerClose = () => {
+            if (!started || closeNotified) return;
+            try {
+                if (typeof navigator !== "undefined" && "sendBeacon" in navigator) {
+                    navigator.sendBeacon(closeUrl, "");
+                } else if (typeof fetch === "function") {
+                    fetch(closeUrl, {
+                        method: "POST",
+                        keepalive: true
+                    }).catch(() => {
+                        // Ignore network errors when unloading the page.
+                    });
+                }
+            } catch {
+                // Ignore notifier errors; SSE will eventually timeout server-side.
+            }
+            closeNotified = true;
         };
 
         const scheduleReconnect = () => {
@@ -76,6 +100,7 @@ const useStatus = ({
             try {
                 const source = new EventSource(watchUrl);
                 eventSource = source;
+                started = true;
 
                 source.onopen = () => {
                     retryDelay = RETRY_BASE_DELAY;
@@ -90,7 +115,7 @@ const useStatus = ({
                         handle(payload);
                     } catch {
                         // Default to PENDING when payload cannot be parsed.
-                        handle({ status: "PENDING" } as StatusResponse);
+                        handle({status: "PENDING"} as StatusResponse);
                     }
                 };
 
@@ -105,8 +130,15 @@ const useStatus = ({
 
         start();
 
-        return stop;
+        const handlePageHide = () => stop();
+
+        window.addEventListener("pagehide", handlePageHide);
+        window.addEventListener("beforeunload", handlePageHide);
+
+        return () => {
+            stop();
+            window.removeEventListener("pagehide", handlePageHide);
+            window.removeEventListener("beforeunload", handlePageHide);
+        };
     }, [challengeId, rootAuthSessionId, tabId, watchBase, setStatus]);
 };
-
-export default useStatus;

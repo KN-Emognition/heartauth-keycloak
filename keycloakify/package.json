@@ -17,7 +17,8 @@
         "keycloakify": "^11.9.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "react-qr-code": "^2.0.18"
+        "react-qr-code": "^2.0.18",
+        "usehooks-ts": "^3.1.1"
     },
     "devDependencies": {
         "@eslint/js": "^9.15.0",

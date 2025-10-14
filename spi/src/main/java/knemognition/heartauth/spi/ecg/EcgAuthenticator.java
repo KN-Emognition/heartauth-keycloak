@@ -6,6 +6,7 @@ import jakarta.ws.rs.core.MultivaluedMap;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
 import knemognition.heartauth.spi.gateway.OrchClient;
+import knemognition.heartauth.spi.status.StatusWatchRegistry;
 import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.AuthenticationFlowContext;
@@ -16,25 +17,27 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
+import knemognition.heartauth.spi.config.HaSessionNotes;
+
 import java.net.URI;
 import java.util.UUID;
 
 
 public class EcgAuthenticator implements Authenticator {
     private static final Logger LOG = Logger.getLogger(EcgAuthenticator.class);
-    private static final String CHALLENGE_ID = "ecg.challengeId";
 
     private void requestNewChallenge(AuthenticationFlowContext ctx) throws ApiException {
         AuthenticationSessionModel sess = ctx.getAuthenticationSession();
+        closeActiveEcgWatch(sess);
         OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
         UUID userId = parseUserId(ctx.getUser());
         UUID challengeId = orchestrator.createChallenge(userId);
-        sess.setAuthNote(CHALLENGE_ID, challengeId.toString());
+        sess.setAuthNote(HaSessionNotes.ECG_CHALLENGE_ID, challengeId.toString());
     }
 
     private void render(AuthenticationFlowContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
-        String idStr = as.getAuthNote(CHALLENGE_ID);
+        String idStr = as.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
         URI watchBase = ctx.getSession()
                 .getContext()
                 .getUri()
@@ -63,7 +66,8 @@ public class EcgAuthenticator implements Authenticator {
     }
 
     private static void clearNotes(AuthenticationSessionModel s) {
-        s.removeAuthNote(CHALLENGE_ID);
+        closeActiveEcgWatch(s);
+        s.removeAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
     }
 
     @Override
@@ -71,8 +75,9 @@ public class EcgAuthenticator implements Authenticator {
         try {
             AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            String existing = sess.getAuthNote(CHALLENGE_ID);
+            String existing = sess.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
             if (existing != null && !existing.isBlank()) {
+                closeActiveEcgWatch(sess);
                 render(ctx);
                 return;
             }
@@ -130,7 +135,7 @@ public class EcgAuthenticator implements Authenticator {
         }
 
         String idStr = ctx.getAuthenticationSession()
-                .getAuthNote(CHALLENGE_ID);
+                .getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
         if (idStr == null || idStr.isBlank()) {
             ctx.failureChallenge(
                     AuthenticationFlowError.EXPIRED_CODE,
@@ -206,5 +211,16 @@ public class EcgAuthenticator implements Authenticator {
 
     @Override
     public void close() {
+    }
+
+    private static void closeActiveEcgWatch(AuthenticationSessionModel session) {
+        if (session == null) {
+            return;
+        }
+        String challengeId = session.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
+        if (challengeId == null || challengeId.isBlank()) {
+            return;
+        }
+        StatusWatchRegistry.closeEcg(session, challengeId);
     }
 }

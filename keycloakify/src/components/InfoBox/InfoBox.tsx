@@ -1,15 +1,19 @@
 import hauthLogo from "../../assets/hauth_logo.png";
 import styles from "./InfoBox.module.css";
+
 interface InfoBoxProps {
     hint: string;
     type?: "success" | "danger" | "warning" | "info";
+    onClick?: () => void;
 }
-const InfoBox = ({ hint, type }: InfoBoxProps) => {
+
+const InfoBox = ({hint, type, onClick}: InfoBoxProps) => {
     return (
         <div
+            onClick={onClick}
             className={`pf-c-alert pf-m-${type || "info"} ${styles.infoBox}`}
             role="status"
-            style={{ width: "100%" }}
+            style={{width: "100%"}}
         >
             <img
                 src={hauthLogo}

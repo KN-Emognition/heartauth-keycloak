@@ -2,17 +2,20 @@ package knemognition.heartauth.spi.status;
 
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.sse.OutboundSseEvent;
 import jakarta.ws.rs.sse.Sse;
 import jakarta.ws.rs.sse.SseEventSink;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.FlowStatusDto;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
+import knemognition.heartauth.spi.config.HaSessionNotes;
 import knemognition.heartauth.spi.gateway.OrchClient;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
@@ -23,6 +26,7 @@ import org.keycloak.sessions.RootAuthenticationSessionModel;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 @Path("")
 public class StatusWatchResource {
@@ -30,7 +34,6 @@ public class StatusWatchResource {
     private static final int POLL_PERIOD_MS = 1500;
     private static final int BACKOFF_STEP_MS = 200;
     private static final int BACKOFF_MAX_STEPS = 5;
-
     private final KeycloakSession session;
 
     public StatusWatchResource(KeycloakSession session) {
@@ -47,7 +50,7 @@ public class StatusWatchResource {
                          @Context SseEventSink sink,
                          @Context Sse sse) {
 
-        watchStatus(rootId, tabId, challengeIdStr, sink, sse,
+        watchStatus(StatusWatchRegistry.TYPE_ECG, rootId, tabId, challengeIdStr, sink, sse,
                 (clientApi, kcSessionId) -> {
                     try {
                         return clientApi.getChallengeStatus(UUID.fromString(challengeIdStr));
@@ -55,6 +58,7 @@ public class StatusWatchResource {
                         throw new RuntimeException(e);
                     }
                 },
+                as -> as.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID),
                 true
         );
     }
@@ -69,7 +73,7 @@ public class StatusWatchResource {
                              @Context SseEventSink sink,
                              @Context Sse sse) {
 
-        watchStatus(rootId, tabId, pairingIdStr, sink, sse,
+        watchStatus(StatusWatchRegistry.TYPE_PAIRING, rootId, tabId, pairingIdStr, sink, sse,
                 (clientApi, kcSessionId) -> {
                     try {
                         return clientApi.getPairingStatus(UUID.fromString(pairingIdStr));
@@ -77,16 +81,47 @@ public class StatusWatchResource {
                         throw new RuntimeException(e);
                     }
                 },
+                as -> as.getAuthNote(HaSessionNotes.PAIRING_JTI),
                 true
         );
     }
 
-    private void watchStatus(String rootId,
+    @POST
+    @Path("watch/ecg/close")
+    @Produces(MediaType.TEXT_PLAIN)
+    @ActivateRequestContext
+    public Response closeEcg(@QueryParam("root") String rootId,
+                             @QueryParam("tab") String tabId,
+                             @QueryParam("id") String challengeIdStr) {
+        closeWatch(StatusWatchRegistry.TYPE_ECG, rootId, tabId, challengeIdStr);
+        return Response.accepted()
+                .type(MediaType.TEXT_PLAIN_TYPE)
+                .entity("closed")
+                .build();
+    }
+
+    @POST
+    @Path("watch/pairing/close")
+    @Produces(MediaType.TEXT_PLAIN)
+    @ActivateRequestContext
+    public Response closePairing(@QueryParam("root") String rootId,
+                                 @QueryParam("tab") String tabId,
+                                 @QueryParam("id") String pairingIdStr) {
+        closeWatch(StatusWatchRegistry.TYPE_PAIRING, rootId, tabId, pairingIdStr);
+        return Response.accepted()
+                .type(MediaType.TEXT_PLAIN_TYPE)
+                .entity("closed")
+                .build();
+    }
+
+    private void watchStatus(String watchType,
+                             String rootId,
                              String tabId,
                              String entityIdStr,
                              SseEventSink sink,
                              Sse sse,
                              BiFunction<OrchClient, String, StatusResponseDto> resolver,
+                             Function<AuthenticationSessionModel, String> activeIdResolver,
                              boolean stopOnTerminal) {
 
         RealmModel realm = session.getContext()
@@ -105,6 +140,11 @@ public class StatusWatchResource {
             return;
         }
 
+        if (!isMatchingEntity(as, entityIdStr, activeIdResolver)) {
+            sendAndCloseError(sink, sse, POLL_PERIOD_MS);
+            return;
+        }
+
         final OrchClient clientApi;
         try {
             clientApi = OrchClient.clientFromRealm(realm);
@@ -114,21 +154,42 @@ public class StatusWatchResource {
         }
 
         final String kcSessionId = root.getId();
+        StatusWatchRegistry.register(watchType, kcSessionId, tabId, entityIdStr, sink);
+
+        if (StatusWatchRegistry.isCloseRequested(watchType, kcSessionId, tabId, entityIdStr)) {
+            StatusWatchRegistry.unregister(watchType, kcSessionId, tabId, entityIdStr, sink);
+            StatusWatchRegistry.markFinished(watchType, kcSessionId, tabId, entityIdStr);
+            close(sink);
+            return;
+        }
 
         if (!safeSendStatus(sink, sse, POLL_PERIOD_MS, FlowStatusDto.PENDING)) {
             close(sink);
+            StatusWatchRegistry.unregister(watchType, kcSessionId, tabId, entityIdStr, sink);
+            StatusWatchRegistry.markFinished(watchType, kcSessionId, tabId, entityIdStr);
             return;
         }
 
         int err = 0;
         try {
+            if (StatusWatchRegistry.isCloseRequested(watchType, kcSessionId, tabId, entityIdStr)) {
+                return;
+            }
             while (!sink.isClosed()) {
+                if (StatusWatchRegistry.isCloseRequested(watchType, kcSessionId, tabId, entityIdStr)) {
+                    return;
+                }
                 try {
                     StatusResponseDto st = resolver.apply(clientApi, kcSessionId);
                     err = 0;
 
                     if (!safeSendStatus(sink, sse, POLL_PERIOD_MS, st.getStatus())) {
                         close(sink);
+                        return;
+                    }
+
+                    if (!isMatchingEntity(as, entityIdStr, activeIdResolver)) {
+                        sendAndCloseError(sink, sse, POLL_PERIOD_MS);
                         return;
                     }
 
@@ -151,7 +212,21 @@ public class StatusWatchResource {
             Thread.currentThread()
                     .interrupt();
         } finally {
+            StatusWatchRegistry.unregister(watchType, kcSessionId, tabId, entityIdStr, sink);
+            StatusWatchRegistry.markFinished(watchType, kcSessionId, tabId, entityIdStr);
             close(sink);
+        }
+    }
+
+    private boolean isMatchingEntity(AuthenticationSessionModel as,
+                                     String entityIdStr,
+                                     Function<AuthenticationSessionModel, String> resolver) {
+        if (resolver == null) return true;
+        try {
+            String current = resolver.apply(as);
+            return current == null || current.isBlank() || Objects.equals(current, entityIdStr);
+        } catch (Exception ex) {
+            return false;
         }
     }
 
@@ -198,5 +273,9 @@ public class StatusWatchResource {
             if (sink != null && !sink.isClosed()) sink.close();
         } catch (Exception ignored) {
         }
+    }
+
+    private static void closeWatch(String type, String rootId, String tabId, String entityIdStr) {
+        StatusWatchRegistry.close(type, rootId, tabId, entityIdStr);
     }
 }
