@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { FlowStatus } from "../types/FlowStatus";
-import { StatusResponse } from "../types/StatusReponse";
+import {useEffect} from "react";
+import {FlowStatus} from "../types/FlowStatus";
+import {StatusResponse} from "../types/StatusReponse";
 
 const TERMINAL: readonly FlowStatus[] = [
     "APPROVED",
@@ -20,13 +20,13 @@ interface Props {
 const RETRY_BASE_DELAY = 1500;
 const RETRY_MAX_DELAY = 8000;
 
-const useStatus = ({
-    id: challengeId,
-    rootAuthSessionId,
-    tabId,
-    watchBase,
-    setStatus
-}: Props) => {
+export default ({
+                    id: challengeId,
+                    rootAuthSessionId,
+                    tabId,
+                    watchBase,
+                    setStatus
+                }: Props) => {
     useEffect(() => {
         if (!watchBase || !rootAuthSessionId || !tabId || !challengeId) return;
 
@@ -90,7 +90,7 @@ const useStatus = ({
                         handle(payload);
                     } catch {
                         // Default to PENDING when payload cannot be parsed.
-                        handle({ status: "PENDING" } as StatusResponse);
+                        handle({status: "PENDING"} as StatusResponse);
                     }
                 };
 
@@ -108,5 +108,3 @@ const useStatus = ({
         return stop;
     }, [challengeId, rootAuthSessionId, tabId, watchBase, setStatus]);
 };
-
-export default useStatus;

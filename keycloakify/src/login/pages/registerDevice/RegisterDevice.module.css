@@ -12,6 +12,21 @@
     width: 100%;
 }
 
+.qrButton {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.qrButton:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+}
+
 .actions {
     margin-top: 24px;
     display: flex;

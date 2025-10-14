@@ -5,5 +5,8 @@
     "denied": "Pairing denied. Use the button below to try again.",
     "expired": "Pairing expired. Request a new QR below.",
     "not_found": "Pairing not found. Request a new QR below.",
-    "resend": "Send a new pairing request"
+    "resend": "Send a new pairing request",
+    "copySuccess": "Pairing code copied to clipboard.",
+    "copyError": "Unable to copy the pairing code. Please copy it manually.",
+    "copyAriaLabel": "Copy pairing code"
 }

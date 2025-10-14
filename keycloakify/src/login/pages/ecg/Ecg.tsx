@@ -1,20 +1,21 @@
-import { useState, useMemo, useRef, useEffect } from "react";
-import type { PageProps } from "keycloakify/login/pages/PageProps";
-import { getKcClsx } from "keycloakify/login/lib/kcClsx";
-import { I18n } from "keycloakify/login/i18n";
-import { FlowStatus } from "../../../types/FlowStatus";
+import {useEffect, useMemo, useRef, useState} from "react";
+import type {PageProps} from "keycloakify/login/pages/PageProps";
+import {getKcClsx} from "keycloakify/login/lib/kcClsx";
+import {I18n} from "keycloakify/login/i18n";
+import {FlowStatus} from "../../../types/FlowStatus";
 import InfoBox from "../../../components/InfoBox/InfoBox";
 import styles from "./Ecg.module.css";
-import { KcContext } from "../../KcContext";
+import {KcContext} from "../../KcContext";
 import useStatus from "../../../hooks/useStatus";
+import useCopyToClipboard from "../../../hooks/useCopyToClipboard.ts";
 
 type Props = PageProps<Extract<KcContext, { pageId: "ecg.ftl" }>, I18n>;
 
 export default function LoginEcg(props: Props) {
-    const { kcContext, i18n, doUseDefaultCss, Template, classes } = props;
-    const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
-    const { url, id, rootAuthSessionId, tabId, watchBase } = kcContext;
-
+    const {kcContext, i18n, doUseDefaultCss, Template, classes} = props;
+    const {kcClsx} = getKcClsx({doUseDefaultCss, classes});
+    const {url, id, rootAuthSessionId, tabId, watchBase} = kcContext;
+    const {handleCopy} = useCopyToClipboard()
     const [status, setStatus] = useState<FlowStatus>("PENDING");
     const isApproved = status === "APPROVED";
     const resendDisabled = status === "APPROVED";
@@ -82,14 +83,13 @@ export default function LoginEcg(props: Props) {
             headerNode={<h1 className={kcClsx("kcFormHeaderClass")}>ECG Authentication</h1>}
         >
             <div className={styles.ecgPanel}>
-                <InfoBox hint={hint} type={alertType} />
-                <InfoBox hint={`Challenge ID: ${id}`} type="warning" />
+                <InfoBox hint={hint} type={alertType} onClick={handleCopy(id)}/>
                 <form
                     method="post"
                     action={url.loginAction}
                     className={styles.resendForm}
                 >
-                    <input type="hidden" name="resend" value="true" />
+                    <input type="hidden" name="resend" value="true"/>
                     <button
                         type="submit"
                         className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
@@ -103,7 +103,7 @@ export default function LoginEcg(props: Props) {
                 ref={finalizeFormRef}
                 method="post"
                 action={url.loginAction}
-                style={{ display: "none" }}
+                style={{display: "none"}}
             />
         </Template>
     );
