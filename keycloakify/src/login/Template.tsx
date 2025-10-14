@@ -35,6 +35,24 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
         document.title = documentTitle ?? msgStr("loginTitle", realm.displayName);
     }, []);
 
+    useEffect(() => {
+        const lockHistory = () => {
+            window.history.pushState(null, "", window.location.href);
+        };
+
+        lockHistory();
+
+        const handlePopState = () => {
+            lockHistory();
+        };
+
+        window.addEventListener("popstate", handlePopState);
+
+        return () => {
+            window.removeEventListener("popstate", handlePopState);
+        };
+    }, [kcContext.pageId]);
+
     useSetClassName({
         qualifiedName: "html",
         className: kcClsx("kcHtmlClass")

@@ -1,27 +1,27 @@
 package knemognition.heartauth.spi.registerDevice;
 
+import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import jakarta.ws.rs.core.MultivaluedMap;
+import java.net.URI;
+import java.util.Optional;
+import java.util.UUID;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.CreatePairingResponseDto;
+import knemognition.heartauth.spi.config.HaSessionNotes;
 import knemognition.heartauth.spi.gateway.OrchClient;
 import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
 import org.jboss.logging.Logger;
 import org.keycloak.authentication.RequiredActionContext;
 import org.keycloak.authentication.RequiredActionProvider;
 import org.keycloak.models.UserModel;
+import org.keycloak.protocol.oidc.OIDCLoginProtocol;
+import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.sessions.AuthenticationSessionModel;
-
-import java.net.URI;
-import java.util.UUID;
 
 public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private static final Logger LOG = Logger.getLogger(RegisterDeviceRequiredAction.class);
-
-    private static final String JTI = "ecg.pair.jti";
-    private static final String JWT = "ecg.pair.jwt";
 
     private static final String REG_PENDING = "hauthRegistrationPending";
     private static final String DEV_REGISTERED = "hauthDeviceRegistered";
@@ -33,9 +33,9 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
                 .getId());
 
         CreatePairingResponseDto res = oc.createPairing(userId);
-        sess.setAuthNote(JTI, res.getJti()
+        sess.setAuthNote(HaSessionNotes.PAIRING_JTI, res.getJti()
                 .toString());
-        sess.setAuthNote(JWT, res.getJwt());
+        sess.setAuthNote(HaSessionNotes.PAIRING_JWT, res.getJwt());
     }
 
     @Override
@@ -53,8 +53,10 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         try {
             AuthenticationSessionModel sess = ctx.getAuthenticationSession();
 
-            String existingJti = sess.getAuthNote(JTI);
-            String existingJwt = sess.getAuthNote(JWT);
+            ensurePendingRegistration(ctx.getUser());
+
+            String existingJti = sess.getAuthNote(HaSessionNotes.PAIRING_JTI);
+            String existingJwt = sess.getAuthNote(HaSessionNotes.PAIRING_JWT);
             if (existingJti != null && !existingJti.isBlank() && existingJwt != null) {
                 render(ctx);
                 return;
@@ -124,7 +126,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         }
 
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
-        String jtiStr = as.getAuthNote(JTI);
+        String jtiStr = as.getAuthNote(HaSessionNotes.PAIRING_JTI);
         if (jtiStr == null || jtiStr.isBlank()) {
             ctx.challenge(ctx.form()
                     .setError("Missing token.")
@@ -141,6 +143,7 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
                     markDeviceRegistered(ctx.getUser());
                     clearPending(ctx.getUser());
                     clearNotes(ctx.getAuthenticationSession());
+                    preparePostRegistrationRedirect(ctx);
                     ctx.success();
                 }
                 case DENIED, EXPIRED, NOT_FOUND -> {
@@ -185,8 +188,8 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
     private void render(RequiredActionContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
 
-        String jti = as.getAuthNote(JTI);
-        String jwt = as.getAuthNote(JWT);
+        String jti = as.getAuthNote(HaSessionNotes.PAIRING_JTI);
+        String jwt = as.getAuthNote(HaSessionNotes.PAIRING_JWT);
 
         URI watchBase = ctx.getSession()
                 .getContext()
@@ -213,8 +216,8 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
     }
 
     private static void clearNotes(AuthenticationSessionModel s) {
-        s.removeAuthNote(JTI);
-        s.removeAuthNote(JWT);
+        s.removeAuthNote(HaSessionNotes.PAIRING_JTI);
+        s.removeAuthNote(HaSessionNotes.PAIRING_JWT);
     }
 
     private boolean isPendingRegistration(UserModel user) {
@@ -241,5 +244,67 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private void markDeviceRegistered(UserModel user) {
         user.setSingleAttribute(DEV_REGISTERED, "true");
+    }
+
+    private void ensurePendingRegistration(UserModel user) {
+        if (isDeviceRegistered(user)) {
+            clearPending(user);
+            return;
+        }
+
+        if (!isPendingRegistration(user)) {
+            user.setSingleAttribute(REG_PENDING, "true");
+        }
+    }
+
+    private void preparePostRegistrationRedirect(RequiredActionContext ctx) {
+        AuthenticationSessionModel session = ctx.getAuthenticationSession();
+        session.setAuthNote(AuthenticationManager.END_AFTER_REQUIRED_ACTIONS, Boolean.TRUE.toString());
+        session.setAuthNote(AuthenticationManager.SET_REDIRECT_URI_AFTER_REQUIRED_ACTIONS, Boolean.TRUE.toString());
+
+        String clientId = Optional.ofNullable(session.getClient())
+                .map(client -> client.getClientId())
+                .orElse(null);
+        String originalRedirect = session.getRedirectUri();
+        String scope = session.getClientNote(OIDCLoginProtocol.SCOPE_PARAM);
+        String responseType = session.getClientNote(OIDCLoginProtocol.RESPONSE_TYPE_PARAM);
+        String state = session.getClientNote(OIDCLoginProtocol.STATE_PARAM);
+        String nonce = session.getClientNote(OIDCLoginProtocol.NONCE_PARAM);
+
+        var builder = ctx.getSession()
+                .getContext()
+                .getUri()
+                .getBaseUriBuilder()
+                .path("realms")
+                .path(ctx.getRealm()
+                        .getName())
+                .path("protocol")
+                .path("openid-connect")
+                .path("auth");
+
+        if (clientId != null && !clientId.isBlank()) {
+            builder.queryParam("client_id", clientId);
+        }
+        if (originalRedirect != null && !originalRedirect.isBlank()) {
+            builder.queryParam(OIDCLoginProtocol.REDIRECT_URI_PARAM, originalRedirect);
+        }
+        if (responseType != null && !responseType.isBlank()) {
+            builder.queryParam(OIDCLoginProtocol.RESPONSE_TYPE_PARAM, responseType);
+        }
+        if (scope != null && !scope.isBlank()) {
+            builder.queryParam(OIDCLoginProtocol.SCOPE_PARAM, scope);
+        }
+        if (state != null && !state.isBlank()) {
+            builder.queryParam(OIDCLoginProtocol.STATE_PARAM, state);
+        }
+        if (nonce != null && !nonce.isBlank()) {
+            builder.queryParam(OIDCLoginProtocol.NONCE_PARAM, nonce);
+        }
+
+        String restartUrl = builder.build()
+                .toString();
+
+        session.setRedirectUri(restartUrl);
+        session.setClientNote(OIDCLoginProtocol.REDIRECT_URI_PARAM, restartUrl);
     }
 }

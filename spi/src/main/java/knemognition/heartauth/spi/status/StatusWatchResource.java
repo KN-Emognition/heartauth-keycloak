@@ -13,6 +13,7 @@ import jakarta.ws.rs.sse.SseEventSink;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.FlowStatusDto;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
+import knemognition.heartauth.spi.config.HaSessionNotes;
 import knemognition.heartauth.spi.gateway.OrchClient;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.KeycloakSession;
@@ -23,6 +24,7 @@ import org.keycloak.sessions.RootAuthenticationSessionModel;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 @Path("")
 public class StatusWatchResource {
@@ -55,6 +57,7 @@ public class StatusWatchResource {
                         throw new RuntimeException(e);
                     }
                 },
+                as -> as.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID),
                 true
         );
     }
@@ -77,6 +80,7 @@ public class StatusWatchResource {
                         throw new RuntimeException(e);
                     }
                 },
+                as -> as.getAuthNote(HaSessionNotes.PAIRING_JTI),
                 true
         );
     }
@@ -87,6 +91,7 @@ public class StatusWatchResource {
                              SseEventSink sink,
                              Sse sse,
                              BiFunction<OrchClient, String, StatusResponseDto> resolver,
+                             Function<AuthenticationSessionModel, String> activeIdResolver,
                              boolean stopOnTerminal) {
 
         RealmModel realm = session.getContext()
@@ -101,6 +106,11 @@ public class StatusWatchResource {
 
         AuthenticationSessionModel as = resolveAuthSession(root, tabId);
         if (as == null || entityIdStr == null || entityIdStr.isBlank()) {
+            sendAndCloseError(sink, sse, POLL_PERIOD_MS);
+            return;
+        }
+
+        if (!isMatchingEntity(as, entityIdStr, activeIdResolver)) {
             sendAndCloseError(sink, sse, POLL_PERIOD_MS);
             return;
         }
@@ -132,6 +142,11 @@ public class StatusWatchResource {
                         return;
                     }
 
+                    if (!isMatchingEntity(as, entityIdStr, activeIdResolver)) {
+                        sendAndCloseError(sink, sse, POLL_PERIOD_MS);
+                        return;
+                    }
+
                     boolean terminal = switch (st.getStatus()) {
                         case APPROVED, DENIED, EXPIRED, NOT_FOUND -> true;
                         case PENDING, CREATED -> false;
@@ -152,6 +167,18 @@ public class StatusWatchResource {
                     .interrupt();
         } finally {
             close(sink);
+        }
+    }
+
+    private boolean isMatchingEntity(AuthenticationSessionModel as,
+                                     String entityIdStr,
+                                     Function<AuthenticationSessionModel, String> resolver) {
+        if (resolver == null) return true;
+        try {
+            String current = resolver.apply(as);
+            return current == null || current.isBlank() || Objects.equals(current, entityIdStr);
+        } catch (Exception ex) {
+            return false;
         }
     }
 
