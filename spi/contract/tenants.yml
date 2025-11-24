@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Heartauth Orchestrator - internal API
+  title: Heartauth Orchestrator - tenants API
   version: 1.0.0
   description: |
     Internal endpoints used by Heartauth tenants to create/poll device pairings and login-time ECG challenges.
@@ -15,7 +15,7 @@ tags:
   - name: Challenge
     description: Create and poll login-time ECG challenges.
 paths:
-  /internal/v1/pairing:
+  /tenants/v1/pairing:
     post:
       operationId: createPairing
       tags:
@@ -47,7 +47,7 @@ paths:
                   value:
                     jti: "6b0a2a75-8d21-4e64-9a9b-3b9d1d3f9e1a"
                     jwt: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
-  /internal/v1/pairing/status/{jti}:
+  /tenants/v1/pairing/status/{jti}:
     get:
       operationId: getPairingStatus
       tags:
@@ -64,7 +64,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
-  /internal/v1/challenge:
+  /tenants/v1/challenge:
     post:
       operationId: createChallenge
       tags:
@@ -95,7 +95,7 @@ paths:
                 default:
                   value:
                     challengeId: "c2a4f2a1-5e1e-4a6d-8b7c-1f7e5fd3c2a1"
-  /internal/v1/challenge/status/{id}:
+  /tenants/v1/challenge/status/{id}:
     get:
       operationId: getChallengeStatus
       tags:
@@ -136,13 +136,17 @@ components:
   schemas:
     CreatePairingRequest:
       type: object
-      required: [ userId ]
+      required: [ userId,username ]
       properties:
         userId:
           type: string
           format: uuid
           description: Unique id of the user initiating pairing.
           example: 8d8a4b2e-1a56-4a3a-8c08-9c3c5a2d5c01
+        username:
+          type: string
+          description: Username
+          example: poziomk3
         ttlSeconds:
           type: integer
           minimum: 30

@@ -3,9 +3,6 @@ package knemognition.heartauth.spi.registerDevice;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import java.net.URI;
-import java.util.Optional;
-import java.util.UUID;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.CreatePairingResponseDto;
 import knemognition.heartauth.spi.config.HaSessionNotes;
@@ -20,6 +17,10 @@ import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.services.managers.AuthenticationManager;
 import org.keycloak.sessions.AuthenticationSessionModel;
 
+import java.net.URI;
+import java.util.Optional;
+import java.util.UUID;
+
 public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
     private static final Logger LOG = Logger.getLogger(RegisterDeviceRequiredAction.class);
@@ -31,10 +32,12 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         AuthenticationSessionModel sess = ctx.getAuthenticationSession();
         closeActivePairingWatch(sess);
         OrchClient oc = OrchClient.clientFromRealm(ctx.getRealm());
+        String username = ctx.getUser()
+                .getUsername();
         UUID userId = UUID.fromString(ctx.getUser()
                 .getId());
 
-        CreatePairingResponseDto res = oc.createPairing(userId);
+        CreatePairingResponseDto res = oc.createPairing(userId,username);
         sess.setAuthNote(HaSessionNotes.PAIRING_JTI, res.getJti()
                 .toString());
         sess.setAuthNote(HaSessionNotes.PAIRING_JWT, res.getJwt());

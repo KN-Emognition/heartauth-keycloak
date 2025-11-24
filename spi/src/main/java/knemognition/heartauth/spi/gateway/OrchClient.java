@@ -92,13 +92,14 @@ public final class OrchClient {
     }
 
 
-    public CreatePairingResponseDto createPairing(UUID userId) throws ApiException {
+    public CreatePairingResponseDto createPairing(UUID userId, String username) throws ApiException {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Create Pairing Request", routeId);
             CreatePairingRequestDto req = CreatePairingRequestDto.builder()
                     .userId(userId)
                     .ttlSeconds(pairingTtlSeconds)
+                    .username(username)
                     .build();
 
             CreatePairingResponseDto resp = pairingApi.createPairing(req);
