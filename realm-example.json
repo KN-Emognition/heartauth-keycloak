@@ -12,6 +12,18 @@
     "ha-pairing.ttl-seconds": "120",
     "ha-challenge.ttl-seconds": "120"
   },
+    "clients": [
+    {
+      "clientId": "heartauth-web-client",
+      "publicClient": true,
+      "secret": "keycloak-client-secret-1234567890",
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
   "requiredActions": [
     {
       "alias": "register-device",
@@ -46,40 +58,10 @@
     }
   ],
 
-  "clients": [
-    {
-      "clientId": "heartauth-web-client",
-      "publicClient": true,
-      "secret": "keycloak-client-secret-1234567890",
-      "redirectUris": ["*"],
-      "webOrigins": ["*"],
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      }
-    }
-  ],
+
 
   "browserSecurityHeaders": {
     "xFrameOptions": "SAMEORIGIN",
     "contentSecurityPolicy": "frame-ancestors *; frame-src 'self'; object-src 'none';"
-  },
-
-  "users": [
-    {
-      "id": "00000000-0000-0000-0000-000000000000",
-      "username": "Nervarien",
-      "enabled": true,
-      "email": "nervarien@example.com",
-      "emailVerified": true,
-      "firstName": "Jan",
-      "lastName": "Nowak",
-      "credentials": [
-        { "type": "password", "value": "Nervarien", "temporary": false }
-      ],
-      "attributes": {
-        "hauthDeviceRegistered": "true"
-      },
-      "requiredActions": []
-    }
-  ]
+  }
 }

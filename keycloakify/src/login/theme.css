@@ -1,0 +1,335 @@
+:root {
+    --hauth-bg-dark: #743a50;
+    --hauth-bg: #a7a1a6;
+    --hauth-surface: #ffffff;
+    --hauth-surface-strong: #fff2f7;
+    --hauth-border: rgba(90, 37, 112, 0.15);
+    --hauth-primary: #d7355c;
+    --hauth-primary-strong: #b52045;
+    --hauth-accent: #6f2e84;
+    --hauth-muted: #7e527f;
+    --hauth-text: #2a1435;
+    --hauth-text-soft: #513a57;
+    --hauth-shadow: 0 35px 80px rgba(79, 32, 110, 0.12);
+    --hauth-radius-lg: 26px;
+    --hauth-radius-pill: 999px;
+    color-scheme: light;
+}
+
+html {
+    font-size: 16px;
+}
+
+body.kcBodyClass {
+    min-height: 100vh;
+    margin: 0;
+    font-family: "Inter", "Space Grotesk", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    background:
+        radial-gradient(60% 80% at 20% 0%, rgba(255, 164, 197, 0.35), transparent 0%),
+        radial-gradient(70% 85% at 100% 10%, rgba(152, 121, 255, 0.25), transparent 65%),
+        linear-gradient(130deg, var(--hauth-bg) 0%, var(--hauth-bg-dark) 60%) fixed;
+    color: var(--hauth-text);
+    overflow-x: hidden;
+}
+
+body.kcBodyClass::before,
+body.kcBodyClass::after {
+    content: "";
+    position: fixed;
+    z-index: 0;
+    inset: auto auto 5% -5%;
+    width: 26vw;
+    height: 26vw;
+    background: radial-gradient(circle, rgba(255, 191, 220, 0.3), transparent 70%);
+    pointer-events: none;
+}
+
+body.kcBodyClass::after {
+    inset: -8% -2% auto auto;
+    width: 22vw;
+    height: 22vw;
+    background: radial-gradient(circle, rgba(164, 140, 255, 0.25), transparent 60%);
+}
+
+.kcLoginClass {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: clamp(32px, 5vw, 80px) 16px 56px;
+    position: relative;
+    z-index: 1;
+    gap: 24px;
+}
+
+#kc-header {
+    text-align: center;
+    width: min(560px, 100%);
+}
+
+#kc-header-wrapper {
+    font-size: clamp(1.75rem, 3vw, 2.4rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0;
+    margin: 0 auto;
+    color: var(--hauth-text);
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+#kc-header-wrapper .hauth-pill {
+    display: inline-flex;
+    gap: 12px;
+    align-items: center;
+    padding: 16px 24px;
+    border-radius: var(--hauth-radius-pill);
+    background: #ffffff;
+    border: 1px solid rgba(215, 53, 92, 0.2);
+    box-shadow: var(--hauth-shadow);
+}
+
+#kc-header-wrapper .hauth-pill img {
+    width: 46px;
+    height: 46px;
+}
+
+#kc-header-wrapper .hauth-pill span {
+    color: var(--hauth-primary);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+}
+
+#kc-header-wrapper .hauth-tagline {
+    font-size: 1rem;
+    color: var(--hauth-muted);
+    text-transform: none;
+    letter-spacing: 0.08em;
+    margin: 0;
+}
+
+.kcFormCardClass {
+    width: min(540px, 100%);
+    border-radius: var(--hauth-radius-lg);
+    padding: clamp(26px, 4vw, 46px);
+    background: var(--hauth-surface);
+    border: 1px solid var(--hauth-border);
+    box-shadow: var(--hauth-shadow);
+}
+
+#kc-form-wrapper,
+#kc-content,
+#kc-content-wrapper {
+    width: 100%;
+}
+
+#kc-form-wrapper > *,
+#kc-content-wrapper > *:not(:last-child) {
+    margin-bottom: 18px;
+}
+
+h1,
+p,
+label,
+.kcRequiredFields,
+.kcLabelWrapperClass,
+.kcFormSettingClass {
+    color: var(--hauth-text-soft);
+}
+
+.kcFormHeaderClass,
+#kc-page-title {
+    color: var(--hauth-text);
+    font-weight: 600;
+}
+
+a {
+    color: var(--hauth-primary);
+    font-weight: 600;
+    transition: color 0.25s ease;
+}
+
+a:hover {
+    color: var(--hauth-primary-strong);
+}
+
+.pf-c-form-control,
+input,
+select,
+textarea {
+    background-color: #fff7fb !important;
+    border-radius: 16px !important;
+    border: 1px solid rgba(69, 25, 84, 0.18) !important;
+    padding: 0.85rem 1rem !important;
+    color: var(--hauth-text) !important;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+}
+
+.pf-c-form-control:focus,
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: rgba(215, 53, 92, 0.8) !important;
+    box-shadow: 0 0 0 3px rgba(215, 53, 92, 0.25);
+    background-color: #fffdfd !important;
+    outline: none;
+}
+
+.kcFormGroupClass + .kcFormGroupClass {
+    margin-top: 16px;
+}
+
+.pf-c-button,
+.kcButtonClass {
+    border-radius: var(--hauth-radius-pill);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.kcButtonPrimaryClass {
+    background: linear-gradient(115deg, #ffa5b8 0%, var(--hauth-primary) 60%);
+    border: none !important;
+    box-shadow: 0 18px 35px rgba(206, 57, 84, 0.2);
+    color: #fff;
+}
+
+.kcButtonPrimaryClass:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 25px 40px rgba(206, 57, 84, 0.3);
+}
+
+.kcButtonPrimaryClass:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.kcButtonSecondaryClass,
+.pf-m-secondary {
+    border: 1px solid rgba(69, 25, 84, 0.2) !important;
+    background: rgba(111, 46, 132, 0.05) !important;
+    color: var(--hauth-text) !important;
+}
+
+#kc-locale {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+}
+
+#kc-locale button,
+#kc-locale a {
+    color: var(--hauth-accent);
+}
+
+#kc-locale ul {
+    background: var(--hauth-surface-strong);
+    border-radius: 18px;
+    border: 1px solid var(--hauth-border);
+    box-shadow: var(--hauth-shadow);
+    padding: 8px 0;
+}
+
+.kcLocaleListItemClass + .kcLocaleListItemClass {
+    border-top: 1px solid rgba(33, 3, 36, 0.08);
+}
+
+.kcLocaleItemClass {
+    padding: 8px 20px;
+    display: block;
+    color: var(--hauth-text);
+}
+
+.pf-c-alert {
+    border-radius: 18px;
+    border: 1px solid rgba(65, 26, 77, 0.12);
+    background: #fff2f7;
+    color: var(--hauth-text);
+}
+
+.pf-c-alert.pf-m-danger {
+    background: #ffe6ee;
+    border-color: rgba(244, 110, 130, 0.45);
+}
+
+.pf-c-alert.pf-m-success {
+    background: #eef8f3;
+    border-color: rgba(56, 173, 123, 0.4);
+}
+
+.pf-c-alert.pf-m-warning {
+    background: #fff6e5;
+    border-color: rgba(245, 169, 59, 0.4);
+}
+
+.kcFormSocialAccountListClass {
+    display: grid;
+    gap: 12px;
+}
+
+.kcSocialProviderLink {
+    border-radius: 16px !important;
+    border: 1px solid rgba(69, 25, 84, 0.15) !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    padding: 0.75rem !important;
+}
+
+.kcSignUpClass {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(59, 16, 70, 0.12);
+    text-align: center;
+}
+
+.kcInfoAreaWrapperClass {
+    text-align: center;
+    color: var(--hauth-muted);
+}
+
+.required {
+    color: var(--hauth-primary);
+}
+
+#kc-info {
+    margin-top: 16px;
+}
+
+.pf-c-alert__title {
+    font-size: 0.95rem;
+}
+
+.kc-login-tooltip {
+    background: rgba(232, 201, 226, 0.65);
+    border-radius: 16px;
+    padding: 6px 12px;
+    color: var(--hauth-text);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--hauth-text);
+    transition: background-color 9999s ease-in-out 0s;
+}
+
+@media (max-width: 768px) {
+    #kc-locale {
+        position: static;
+        align-self: flex-end;
+        margin-bottom: 8px;
+    }
+
+    .kcFormCardClass {
+        padding: 24px;
+    }
+
+    #kc-header-wrapper .hauth-pill {
+        width: 100%;
+        justify-content: center;
+    }
+}

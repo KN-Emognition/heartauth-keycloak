@@ -1,50 +1,78 @@
+.ecgShell {
+  position: relative;
+  padding: 30px 26px 36px;
+  border-radius: 32px;
+  border: 1px solid rgba(94, 34, 115, 0.12);
+  background: linear-gradient(150deg, #fff 0%, #fff3f7 70%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ecgShell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(150deg, rgba(213, 60, 86, 0.15), transparent 55%);
+  pointer-events: none;
+}
+
+.sparkTop,
+.sparkBottom {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+  opacity: 0.28;
+  filter: drop-shadow(0 20px 35px rgba(164, 120, 200, 0.2));
+  z-index: 0;
+}
+
+.sparkTop {
+  top: -70px;
+  left: -32px;
+  transform: rotate(-6deg);
+  background-image: url("../../../assets/illustrations/intro-rings.svg");
+}
+
+.sparkBottom {
+  bottom: -60px;
+  right: -40px;
+  transform: rotate(6deg);
+  background-image: url("../../../assets/illustrations/intro-wave.svg");
+}
 
 .ecgPanel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
-
-.ecgLogo {
-  display: block;
-  margin: 4px auto 8px;
-  width: 180px;
-  max-width: 70%;
-}
-
-.ecgStatus {
-  font-size: 0.9rem;
-  opacity: 0.9;
-}
-
-.ecgDebug {
-  margin-top: 6px;
-  font-size: 0.8rem;
-  opacity: 0.6;
-}
-
-.ecgActions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.ecgLinkRestart { text-decoration: underline; }
 
 .resendForm {
-  margin-top: 8px;
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
 }
 
 .resendForm button {
   min-width: 220px;
 }
 
-/* WAŻNE: to są klasy globalne PatternFly – musisz użyć :global(...) */
-:global(.pf-c-alert) {
-  width: 100%;
-  /* border-radius: 8px; */
+@media (max-width: 540px) {
+  .ecgShell {
+    padding: 22px 18px 28px;
+    border-radius: 26px;
+  }
+
+  .sparkTop,
+  .sparkBottom {
+    opacity: 0.18;
+  }
 }

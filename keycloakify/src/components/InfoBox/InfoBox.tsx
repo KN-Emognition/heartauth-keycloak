@@ -8,12 +8,15 @@ interface InfoBoxProps {
 }
 
 const InfoBox = ({hint, type, onClick}: InfoBoxProps) => {
+    const isClickable = typeof onClick === "function";
+
     return (
         <div
             onClick={onClick}
             className={`pf-c-alert pf-m-${type || "info"} ${styles.infoBox}`}
             role="status"
             style={{width: "100%"}}
+            data-clickable={isClickable || undefined}
         >
             <img
                 src={hauthLogo}

@@ -86,31 +86,37 @@ export default function RegisterDevice(props: Props) {
             displayInfo={false}
             headerNode={<Title/>}
         >
-            <div className={styles.panel} aria-live="polite">
-                {qr && (
-                    <QRCode
-                        style={{height: "auto", width: "80%", maxWidth: 250}}
-                        value={qr}
-                        onClick={handleCopy(qr)}
-                    />
-                )}
-                <InfoBox hint={hint} type={alertType}/>
-            </div>
+            <section className={styles.registerShell}>
+                <span className={styles.artTop} aria-hidden="true"></span>
+                <span className={styles.artBottom} aria-hidden="true"></span>
+                <div className={styles.panel} aria-live="polite">
+                    {qr && (
+                        <div className={styles.qr}>
+                            <QRCode
+                                style={{height: "auto", width: "80%", maxWidth: 250}}
+                                value={qr}
+                                onClick={handleCopy(qr)}
+                            />
+                        </div>
+                    )}
+                    <InfoBox hint={hint} type={alertType}/>
+                </div>
 
-            <form
-                method="post"
-                action={url.loginAction}
-                className={styles.actions}
-            >
-                <input type="hidden" name="resend" value="true"/>
-                <button
-                    type="submit"
-                    className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
-                    disabled={resendDisabled}
+                <form
+                    method="post"
+                    action={url.loginAction}
+                    className={styles.actions}
                 >
-                    {labels.resend ?? "Send a new pairing request"}
-                </button>
-            </form>
+                    <input type="hidden" name="resend" value="true"/>
+                    <button
+                        type="submit"
+                        className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
+                        disabled={resendDisabled}
+                    >
+                        {labels.resend ?? "Send a new pairing request"}
+                    </button>
+                </form>
+            </section>
 
             <form
                 ref={finalizeFormRef}

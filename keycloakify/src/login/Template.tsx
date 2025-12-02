@@ -7,6 +7,8 @@ import { useSetClassName } from "keycloakify/tools/useSetClassName";
 import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
+import hauthLogo from "../assets/hauth_logo.svg";
+import "./theme.css";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
     const {
@@ -71,29 +73,12 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
 
     return (
         <div className={kcClsx("kcLoginClass")}>
-            <div id="kc-header" className={kcClsx("kcHeaderClass")}>
-                <div id="kc-header-wrapper" className={kcClsx("kcHeaderWrapperClass")}>
-                    {/* {msg("loginTitleHtml", realm.displayNameHtml)} */}
-                    KN Emognition Theme
-                    {/* <img src={hauthLogo} width={200} /> */}
-                </div>
-            </div>
             <div className={kcClsx("kcFormCardClass")}>
                 <header className={kcClsx("kcFormHeaderClass")}>
                     {enabledLanguages.length > 1 && (
                         <div className={kcClsx("kcLocaleMainClass")} id="kc-locale">
                             <div id="kc-locale-wrapper" className={kcClsx("kcLocaleWrapperClass")}>
                                 <div id="kc-locale-dropdown" className={clsx("menu-button-links", kcClsx("kcLocaleDropDownClass"))}>
-                                    <button
-                                        tabIndex={1}
-                                        id="kc-current-locale-link"
-                                        aria-label={msgStr("languages")}
-                                        aria-haspopup="true"
-                                        aria-expanded="false"
-                                        aria-controls="language-switch1"
-                                    >
-                                        {currentLanguage.label}
-                                    </button>
                                     <ul
                                         role="menu"
                                         tabIndex={-1}

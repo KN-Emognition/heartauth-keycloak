@@ -82,23 +82,27 @@ export default function LoginEcg(props: Props) {
             displayInfo={false}
             headerNode={<h1 className={kcClsx("kcFormHeaderClass")}>ECG Authentication</h1>}
         >
-            <div className={styles.ecgPanel}>
-                <InfoBox hint={hint} type={alertType} onClick={handleCopy(id)}/>
-                <form
-                    method="post"
-                    action={url.loginAction}
-                    className={styles.resendForm}
-                >
-                    <input type="hidden" name="resend" value="true"/>
-                    <button
-                        type="submit"
-                        className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
-                        disabled={resendDisabled}
+            <section className={styles.ecgShell}>
+                <span className={styles.sparkTop} aria-hidden="true"></span>
+                <span className={styles.sparkBottom} aria-hidden="true"></span>
+                <div className={styles.ecgPanel}>
+                    <InfoBox hint={hint} type={alertType} onClick={handleCopy(id)}/>
+                    <form
+                        method="post"
+                        action={url.loginAction}
+                        className={styles.resendForm}
                     >
-                        Send a new authentication request
-                    </button>
-                </form>
-            </div>
+                        <input type="hidden" name="resend" value="true"/>
+                        <button
+                            type="submit"
+                            className={kcClsx("kcButtonClass", "kcButtonPrimaryClass")}
+                            disabled={resendDisabled}
+                        >
+                            Send a new authentication request
+                        </button>
+                    </form>
+                </div>
+            </section>
             <form
                 ref={finalizeFormRef}
                 method="post"
