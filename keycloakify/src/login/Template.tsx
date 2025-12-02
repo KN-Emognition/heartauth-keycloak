@@ -7,7 +7,6 @@ import { useSetClassName } from "keycloakify/tools/useSetClassName";
 import { useInitialize } from "keycloakify/login/Template.useInitialize";
 import type { I18n } from "./i18n";
 import type { KcContext } from "./KcContext";
-import hauthLogo from "../assets/hauth_logo.svg";
 import "./theme.css";
 
 export default function Template(props: TemplateProps<KcContext, I18n>) {
@@ -29,7 +28,7 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
 
     const { kcClsx } = getKcClsx({ doUseDefaultCss, classes });
 
-    const { msg, msgStr, currentLanguage, enabledLanguages } = i18n;
+    const { msg, msgStr, enabledLanguages } = i18n;
 
     const { realm, auth, url, message, isAppInitiatedAction } = kcContext;
 
@@ -133,7 +132,6 @@ export default function Template(props: TemplateProps<KcContext, I18n>) {
                 </header>
                 <div id="kc-content">
                     <div id="kc-content-wrapper">
-                        {/* App-initiated actions should not see warning messages about the need to complete the action during login. */}
                         {displayMessage && message !== undefined && (message.type !== "warning" || !isAppInitiatedAction) && (
                             <div
                                 className={clsx(
