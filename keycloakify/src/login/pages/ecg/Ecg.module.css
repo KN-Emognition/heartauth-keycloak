@@ -1,78 +1,84 @@
 .ecgShell {
-  position: relative;
-  padding: 30px 26px 36px;
-  border-radius: 32px;
-  border: 1px solid rgba(94, 34, 115, 0.12);
-  background: linear-gradient(150deg, #fff 0%, #fff3f7 70%);
-  overflow: hidden;
-  isolation: isolate;
+    position: relative;
+    width: min(640px, 100%);
+    margin: 0 auto;
+    padding: 28px 24px 34px;
+    border-radius: 32px;
+    border: 1px solid rgba(42, 10, 61, 0.14); /* plum border */
+    background: radial-gradient(
+            130% 160% at 0% 0%,
+            rgba(179, 29, 29, 0.06),
+            transparent 55%
+        ),
+        radial-gradient(130% 160% at 100% 0%, rgba(42, 10, 61, 0.06), transparent 55%),
+        linear-gradient(135deg, #fff3f5 0%, #fdf2ff 70%);
+    box-shadow: 0 28px 60px rgba(42, 10, 61, 0.18);
+    overflow: hidden;
+    isolation: isolate;
 }
 
-.ecgShell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(150deg, rgba(213, 60, 86, 0.15), transparent 55%);
-  pointer-events: none;
-}
-
+/* optional decorative sparks if you use them in the JSX */
 .sparkTop,
 .sparkBottom {
-  position: absolute;
-  width: 200px;
-  height: 200px;
-  background-repeat: no-repeat;
-  background-size: contain;
-  pointer-events: none;
-  opacity: 0.28;
-  filter: drop-shadow(0 20px 35px rgba(164, 120, 200, 0.2));
-  z-index: 0;
-}
-
-.sparkTop {
-  top: -70px;
-  left: -32px;
-  transform: rotate(-6deg);
-  background-image: url("../../../assets/illustrations/intro-rings.svg");
-}
-
-.sparkBottom {
-  bottom: -60px;
-  right: -40px;
-  transform: rotate(6deg);
-  background-image: url("../../../assets/illustrations/intro-wave.svg");
+    position: absolute;
+    width: 220px;
+    height: 220px;
+    opacity: 0.18;
+    background-repeat: no-repeat;
+    background-size: contain;
+    filter: drop-shadow(0 18px 32px rgba(42, 10, 61, 0.18));
+    pointer-events: none;
+    z-index: 0;
 }
 
 .ecgPanel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  text-align: center;
-  position: relative;
-  z-index: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    text-align: center;
+    width: 100%;
+    margin-inline: auto;
+    z-index: 1;
 }
 
 .resendForm {
-  margin-top: 16px;
-  display: flex;
-  justify-content: center;
-  position: relative;
-  z-index: 1;
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
 }
 
 .resendForm button {
-  min-width: 220px;
+    min-width: 220px;
 }
 
 @media (max-width: 540px) {
-  .ecgShell {
-    padding: 22px 18px 28px;
-    border-radius: 26px;
-  }
+    .ecgShell {
+        width: 100%;
+        padding: 20px 16px 26px;
+        border-radius: 24px;
+        box-shadow: 0 20px 45px rgba(42, 10, 61, 0.2);
+    }
 
-  .sparkTop,
-  .sparkBottom {
-    opacity: 0.18;
-  }
+    .ecgPanel {
+        gap: 20px;
+    }
+
+    .countdownContainer {
+        width: 170px;
+        height: 170px;
+    }
+
+    .resendForm button {
+        width: 100%;
+        max-width: 260px;
+    }
+
+    .sparkTop,
+    .sparkBottom {
+        opacity: 0.12;
+    }
 }

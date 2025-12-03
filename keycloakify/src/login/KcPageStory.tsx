@@ -16,14 +16,18 @@ const kcContextExtensionPerPage: KcContextExtensionPerPage = {
         id: "challengeId123",
         rootAuthSessionId: "rootAuthSessionId123",
         tabId: "tabId123",
-        watchBase: "watchBase123"
+        watchBase: "watchBase123",
+        ttl: 300,
+        exp: Math.floor(Date.now() / 1000) + 100
     },
     "registerDevice.ftl": {
         qr: "qrCodeData",
         id: "pairingId123",
         rootAuthSessionId: "rootAuthSessionId123",
         tabId: "tabId123",
-        watchBase: "watchBase123"
+        watchBase: "watchBase123",
+        ttl: 300,
+        exp: Math.floor(Date.now() / 1000) + 20
     }
 };
 

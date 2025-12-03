@@ -4,10 +4,13 @@
     align-items: center !important;
     padding: 18px 22px;
     border-radius: 24px !important;
-    border: 1px solid rgba(90, 37, 112, 0.15);
-    background: #fff6fb;
-    box-shadow: 0 16px 32px rgba(80, 32, 110, 0.12);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    border: 1px solid rgba(42, 10, 61, 0.16); /* plum-ish border */
+    background: #fff5f5;                      /* soft warm/red surface */
+    box-shadow: 0 16px 32px rgba(42, 10, 61, 0.16);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .infoBox[data-clickable="true"] {
@@ -16,23 +19,24 @@
 
 .infoBox[data-clickable="true"]:hover {
     transform: translateY(-1px);
-    border-color: rgba(90, 37, 112, 0.35);
-    box-shadow: 0 24px 48px rgba(80, 32, 110, 0.18);
+    border-color: rgba(179, 29, 29, 0.45);   /* stronger red on hover */
+    box-shadow: 0 24px 48px rgba(42, 10, 61, 0.22);
 }
 
 .icon {
     margin-right: 4px;
     border-radius: 16px;
-    background: #ffe4ef;
+    background: #ffe1e1;                     /* light red chip */
     padding: 10px;
     width: 54px;
     height: 54px;
     object-fit: contain;
-    box-shadow: inset 0 0 0 1px rgba(90, 37, 112, 0.15);
+    box-shadow: inset 0 0 0 1px rgba(179, 29, 29, 0.28);
 }
 
 .hint {
     font-size: 1rem;
     line-height: 1.4;
     font-weight: 500;
+    color: var(--hauth-text-soft);
 }

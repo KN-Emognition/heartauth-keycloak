@@ -1,19 +1,32 @@
 .registerShell {
     position: relative;
-    padding: 32px 28px 40px;
-    border-radius: 32px;
-    border: 1px solid rgba(94, 34, 115, 0.12);
-    background: linear-gradient(135deg, #fff 0%, #fef1f5 65%);
+    padding: 24px 20px 30px;
+    border-radius: 24px;
+    /* soften the big white card feeling */
+    background: radial-gradient(
+            130% 160% at 0% 0%,
+            rgba(179, 29, 29, 0.06),
+            transparent 55%
+        ),
+        radial-gradient(130% 160% at 100% 0%, rgba(42, 10, 61, 0.06), transparent 55%),
+        linear-gradient(135deg, #fff3f5 0%, #fdf2ff 70%);
+    border: 1px solid rgba(42, 10, 61, 0.12);
     overflow: hidden;
     isolation: isolate;
 }
 
-.registerShell::before {
-    content: "";
+/* decorative art stays super subtle behind everything */
+.artTop,
+.artBottom {
     position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 60%);
+    width: 220px;
+    height: 220px;
+    opacity: 0.18;
+    background-repeat: no-repeat;
+    background-size: contain;
+    filter: drop-shadow(0 18px 32px rgba(42, 10, 61, 0.18));
     pointer-events: none;
+    z-index: 0;
 }
 
 .panel {
@@ -21,7 +34,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 32px;
+    gap: 24px;
     text-align: center;
     width: 100%;
     margin-inline: auto;
@@ -32,47 +45,44 @@
     font-size: 1rem;
 }
 
-.artTop,
-.artBottom {
-    position: absolute;
-    width: 220px;
-    height: 220px;
-    opacity: 0.3;
-    background-repeat: no-repeat;
-    background-size: contain;
-    filter: drop-shadow(0 25px 45px rgba(180, 120, 200, 0.2));
-    pointer-events: none;
-    z-index: 0;
-}
-
-.artTop {
-    top: -70px;
-    right: -30px;
-    transform: rotate(-12deg);
-    background-image: url("../../../assets/illustrations/intro-wave.svg");
-}
-
-.artBottom {
-    bottom: -60px;
-    left: -58px;
-    transform: rotate(10deg);
-    background-image: url("../../../assets/illustrations/intro-card.svg");
-}
-
+/* 🔹 QR wrapper: no more “mini card” */
 .qr {
-    background: #fff8fc;
-    padding: 20px;
-    border-radius: 24px;
-    border: 1px solid rgba(94, 34, 115, 0.12);
-    box-shadow: 0 20px 35px rgba(84, 33, 110, 0.15);
+    padding: 0;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
+/* style the QR itself instead: subtle shadow, soft corners */
+.qr svg {
+    display: block;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 14px 28px rgba(42, 10, 61, 0.25);
+}
+
+/* countdown circle for ProgressBar */
+.countdownContainer {
+    width: 190px;
+    height: 190px;
+    margin: 0.75rem auto 0.25rem auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* alerts full width, but keep them soft */
 :global(.pf-c-alert) {
     width: 100%;
+    border-radius: 18px;
 }
 
 .actions {
-    margin-top: 28px;
+    margin-top: 24px;
     display: flex;
     justify-content: center;
     position: relative;
@@ -85,12 +95,54 @@
 
 @media (max-width: 540px) {
     .registerShell {
-        padding: 24px 18px 30px;
-        border-radius: 26px;
+        padding: 18px 14px 24px;
+        border-radius: 20px;
+        background: radial-gradient(
+                140% 160% at 0% 0%,
+                rgba(179, 29, 29, 0.08),
+                transparent 55%
+            ),
+            radial-gradient(140% 160% at 100% 0%, rgba(42, 10, 61, 0.08), transparent 55%),
+            linear-gradient(135deg, #fff4f5 0%, #fdf3ff 70%);
+    }
+
+    .panel {
+        gap: 20px;
+    }
+
+    .countdownContainer {
+        width: 170px;
+        height: 170px;
+    }
+
+    .actions button {
+        width: 100%;
+        max-width: 260px;
     }
 
     .artTop,
     .artBottom {
-        opacity: 0.2;
+        opacity: 0.12;
     }
+}
+
+/* Wrapper just centers it, not a heavy card */
+.qr {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The QR itself (SVG) gets the “ours” look */
+.qrCode {
+    border-radius: 24px;
+    padding: 12px;
+    background: radial-gradient(circle at 20% 0%, #fff7f7 0%, #ffeef4 65%);
+    box-shadow: 0 16px 30px rgba(42, 10, 61, 0.25);
+    overflow: hidden; /* clip corners */
+}
+
+/* Make sure it renders crisply and doesn't stretch weirdly */
+.qrCode > rect {
+    shape-rendering: crispEdges;
 }

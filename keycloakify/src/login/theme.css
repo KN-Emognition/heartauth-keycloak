@@ -1,16 +1,20 @@
 :root {
-    --hauth-bg-dark: #743a50;
-    --hauth-bg: #a7a1a6;
+    /* Core palette shifted to match Progress component */
+    --hauth-bg-dark: #2a0a3d; /* deep plum */
+    --hauth-bg: #4d1b26; /* dark reddish background */
     --hauth-surface: #ffffff;
-    --hauth-surface-strong: #fff2f7;
-    --hauth-border: rgba(90, 37, 112, 0.15);
-    --hauth-primary: #d7355c;
-    --hauth-primary-strong: #b52045;
-    --hauth-accent: #6f2e84;
-    --hauth-muted: #7e527f;
-    --hauth-text: #2a1435;
-    --hauth-text-soft: #513a57;
-    --hauth-shadow: 0 35px 80px rgba(79, 32, 110, 0.12);
+    --hauth-surface-strong: #fff5f5; /* soft warm surface */
+    --hauth-border: rgba(42, 10, 61, 0.15);
+
+    --hauth-primary: #b31d1d; /* main red (from Progress) */
+    --hauth-primary-strong: #8e1515; /* darker red for hover/active */
+    --hauth-accent: #2a0a3d; /* plum accent (from Progress) */
+    --hauth-muted: #806072;
+
+    --hauth-text: #1d0f26;
+    --hauth-text-soft: #4a334e;
+
+    --hauth-shadow: 0 35px 80px rgba(42, 10, 61, 0.28);
     --hauth-radius-lg: 26px;
     --hauth-radius-pill: 999px;
     color-scheme: light;
@@ -23,10 +27,17 @@ html {
 body.kcBodyClass {
     min-height: 100vh;
     margin: 0;
-    font-family: "Inter", "Space Grotesk", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family:
+        "Inter",
+        "Space Grotesk",
+        "Segoe UI",
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        sans-serif;
     background:
-        radial-gradient(60% 80% at 20% 0%, rgba(255, 164, 197, 0.35), transparent 0%),
-        radial-gradient(70% 85% at 100% 10%, rgba(152, 121, 255, 0.25), transparent 65%),
+        radial-gradient(60% 80% at 20% 0%, rgba(255, 190, 190, 0.35), transparent 60%),
+        radial-gradient(70% 85% at 100% 10%, rgba(94, 70, 150, 0.25), transparent 65%),
         linear-gradient(130deg, var(--hauth-bg) 0%, var(--hauth-bg-dark) 60%) fixed;
     color: var(--hauth-text);
     overflow-x: hidden;
@@ -40,15 +51,38 @@ body.kcBodyClass::after {
     inset: auto auto 5% -5%;
     width: 26vw;
     height: 26vw;
-    background: radial-gradient(circle, rgba(255, 191, 220, 0.3), transparent 70%);
+    background: radial-gradient(circle, rgba(255, 200, 200, 0.32), transparent 70%);
     pointer-events: none;
+}
+
+body.kcBodyClass::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: min(70vw, 1400px);
+    height: min(90vw, 1400px);
+
+    background-color: rgba(209, 16, 16, 0.05);
+
+    -webkit-mask-image: url("../assets/hauth_logo.svg");
+    mask-image: url("../assets/hauth_logo.svg");
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+
+    pointer-events: none;
+    z-index: 0;
 }
 
 body.kcBodyClass::after {
     inset: -8% -2% auto auto;
     width: 22vw;
     height: 22vw;
-    background: radial-gradient(circle, rgba(164, 140, 255, 0.25), transparent 60%);
+    background: radial-gradient(circle, rgba(120, 92, 186, 0.26), transparent 60%);
 }
 
 .kcLoginClass {
@@ -89,7 +123,7 @@ body.kcBodyClass::after {
     padding: 16px 24px;
     border-radius: var(--hauth-radius-pill);
     background: #ffffff;
-    border: 1px solid rgba(215, 53, 92, 0.2);
+    border: 1px solid rgba(179, 29, 29, 0.22); /* primary-ish border */
     box-shadow: var(--hauth-shadow);
 }
 
@@ -116,9 +150,16 @@ body.kcBodyClass::after {
     width: min(540px, 100%);
     border-radius: var(--hauth-radius-lg);
     padding: clamp(26px, 4vw, 46px);
-    background: var(--hauth-surface);
-    border: 1px solid var(--hauth-border);
+    background: radial-gradient(
+            130% 180% at 0% 0%,
+            rgba(179, 29, 29, 0.06),
+            transparent 55%
+        ),
+        radial-gradient(130% 180% at 100% 0%, rgba(42, 10, 61, 0.06), transparent 55%),
+        linear-gradient(135deg, #fff7f8 0%, #f9f0ff 70%);
+    border: 1px solid rgba(42, 10, 61, 0.18);
     box-shadow: var(--hauth-shadow);
+    backdrop-filter: blur(6px);
 }
 
 #kc-form-wrapper,
@@ -161,20 +202,23 @@ a:hover {
 input,
 select,
 textarea {
-    background-color: #fff7fb !important;
+    background-color: #fff5f5 !important;
     border-radius: 16px !important;
-    border: 1px solid rgba(69, 25, 84, 0.18) !important;
+    border: 1px solid rgba(42, 10, 61, 0.18) !important;
     padding: 0.85rem 1rem !important;
     color: var(--hauth-text) !important;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        background 0.3s ease;
 }
 
 .pf-c-form-control:focus,
 input:focus,
 select:focus,
 textarea:focus {
-    border-color: rgba(215, 53, 92, 0.8) !important;
-    box-shadow: 0 0 0 3px rgba(215, 53, 92, 0.25);
+    border-color: rgba(179, 29, 29, 0.9) !important;
+    box-shadow: 0 0 0 3px rgba(179, 29, 29, 0.25);
     background-color: #fffdfd !important;
     outline: none;
 }
@@ -189,30 +233,38 @@ textarea:focus {
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
 }
 
 .kcButtonPrimaryClass {
-    background: linear-gradient(115deg, #ffa5b8 0%, var(--hauth-primary) 60%);
+    background: linear-gradient(
+        115deg,
+        #f58a8a 0%,
+        var(--hauth-primary) 45%,
+        var(--hauth-accent) 100%
+    );
     border: none !important;
-    box-shadow: 0 18px 35px rgba(206, 57, 84, 0.2);
-    color: #fff;
+    box-shadow: 0 18px 35px rgba(179, 29, 29, 0.32);
+    color: #fff !important;
 }
 
 .kcButtonPrimaryClass:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 25px 40px rgba(206, 57, 84, 0.3);
+    box-shadow: 0 25px 40px rgba(179, 29, 29, 0.42);
 }
 
 .kcButtonPrimaryClass:disabled {
-    opacity: 0.6;
+    opacity: 1;
     cursor: not-allowed;
 }
 
 .kcButtonSecondaryClass,
 .pf-m-secondary {
-    border: 1px solid rgba(69, 25, 84, 0.2) !important;
-    background: rgba(111, 46, 132, 0.05) !important;
+    border: 1px solid rgba(42, 10, 61, 0.25) !important;
+    background: rgba(42, 10, 61, 0.06) !important;
     color: var(--hauth-text) !important;
 }
 
@@ -236,7 +288,7 @@ textarea:focus {
 }
 
 .kcLocaleListItemClass + .kcLocaleListItemClass {
-    border-top: 1px solid rgba(33, 3, 36, 0.08);
+    border-top: 1px solid rgba(26, 6, 32, 0.08);
 }
 
 .kcLocaleItemClass {
@@ -247,14 +299,14 @@ textarea:focus {
 
 .pf-c-alert {
     border-radius: 18px;
-    border: 1px solid rgba(65, 26, 77, 0.12);
-    background: #fff2f7;
+    border: 1px solid rgba(42, 10, 61, 0.12);
+    background: #fff5f5;
     color: var(--hauth-text);
 }
 
 .pf-c-alert.pf-m-danger {
-    background: #ffe6ee;
-    border-color: rgba(244, 110, 130, 0.45);
+    background: #ffe5e7;
+    border-color: rgba(179, 29, 29, 0.55);
 }
 
 .pf-c-alert.pf-m-success {
@@ -274,7 +326,7 @@ textarea:focus {
 
 .kcSocialProviderLink {
     border-radius: 16px !important;
-    border: 1px solid rgba(69, 25, 84, 0.15) !important;
+    border: 1px solid rgba(42, 10, 61, 0.18) !important;
     background: rgba(255, 255, 255, 0.9) !important;
     padding: 0.75rem !important;
 }
@@ -282,7 +334,7 @@ textarea:focus {
 .kcSignUpClass {
     margin-top: 20px;
     padding-top: 20px;
-    border-top: 1px solid rgba(59, 16, 70, 0.12);
+    border-top: 1px solid rgba(42, 10, 61, 0.15);
     text-align: center;
 }
 
@@ -304,7 +356,7 @@ textarea:focus {
 }
 
 .kc-login-tooltip {
-    background: rgba(232, 201, 226, 0.65);
+    background: rgba(236, 197, 197, 0.7);
     border-radius: 16px;
     padding: 6px 12px;
     color: var(--hauth-text);

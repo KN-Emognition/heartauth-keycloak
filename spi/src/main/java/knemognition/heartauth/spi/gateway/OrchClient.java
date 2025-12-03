@@ -74,7 +74,7 @@ public final class OrchClient {
         this.challengeTtlSeconds = cfg.challengeTtlSeconds();
     }
 
-    public UUID createChallenge(UUID userId) throws ApiException {
+    public CreateChallengeResponseDto createChallenge(UUID userId) throws ApiException {
         String routeId = createRouteId();
         try {
             LOG.infof("routeId=%s Sent Create Challenge Request", routeId);
@@ -85,7 +85,7 @@ public final class OrchClient {
 
             CreateChallengeResponseDto resp = challengeApi.createChallenge(req);
             LOG.infof("routeId=%s Received Response to Challenge Create", routeId);
-            return resp.getChallengeId();
+            return resp;
         } finally {
             MDC.remove(HaConstants.MDC_ROUTE_ID);
         }

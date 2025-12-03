@@ -37,10 +37,13 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         UUID userId = UUID.fromString(ctx.getUser()
                 .getId());
 
-        CreatePairingResponseDto res = oc.createPairing(userId,username);
+        CreatePairingResponseDto res = oc.createPairing(userId, username);
         sess.setAuthNote(HaSessionNotes.PAIRING_JTI, res.getJti()
                 .toString());
         sess.setAuthNote(HaSessionNotes.PAIRING_JWT, res.getJwt());
+        sess.setAuthNote(HaSessionNotes.TTL, String.valueOf(res.getTtl()));
+        sess.setAuthNote(HaSessionNotes.EXP, String.valueOf(res.getExp()));
+        ;
     }
 
     @Override
@@ -196,6 +199,8 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
 
         String jti = as.getAuthNote(HaSessionNotes.PAIRING_JTI);
         String jwt = as.getAuthNote(HaSessionNotes.PAIRING_JWT);
+        Long ttl = Long.valueOf(as.getAuthNote(HaSessionNotes.TTL));
+        Long exp = Long.valueOf(as.getAuthNote(HaSessionNotes.EXP));
 
         URI watchBase = ctx.getSession()
                 .getContext()
@@ -212,6 +217,8 @@ public class RegisterDeviceRequiredAction implements RequiredActionProvider {
         Response page = ctx.form()
                 .setAttribute("qr", jwt)
                 .setAttribute("id", jti)
+                .setAttribute("ttl", ttl)
+                .setAttribute("exp", exp)
                 .setAttribute("rootAuthSessionId", as.getParentSession()
                         .getId())
                 .setAttribute("tabId", as.getTabId())

@@ -1,10 +1,11 @@
 package knemognition.heartauth.spi.ecg;
 
+import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import jakarta.ws.rs.core.MultivaluedMap;
 import knemognition.heartauth.orchestrator.ApiException;
 import knemognition.heartauth.orchestrator.model.StatusResponseDto;
+import knemognition.heartauth.spi.config.HaSessionNotes;
 import knemognition.heartauth.spi.gateway.OrchClient;
 import knemognition.heartauth.spi.status.StatusWatchRegistry;
 import knemognition.heartauth.spi.status.StatusWatchResourceProviderFactory;
@@ -16,8 +17,6 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.sessions.AuthenticationSessionModel;
-
-import knemognition.heartauth.spi.config.HaSessionNotes;
 
 import java.net.URI;
 import java.util.UUID;
@@ -31,13 +30,19 @@ public class EcgAuthenticator implements Authenticator {
         closeActiveEcgWatch(sess);
         OrchClient orchestrator = OrchClient.clientFromRealm(ctx.getRealm());
         UUID userId = parseUserId(ctx.getUser());
-        UUID challengeId = orchestrator.createChallenge(userId);
-        sess.setAuthNote(HaSessionNotes.ECG_CHALLENGE_ID, challengeId.toString());
+        var response = orchestrator.createChallenge(userId);
+        sess.setAuthNote(HaSessionNotes.ECG_CHALLENGE_ID, response.getChallengeId()
+                .toString());
+        sess.setAuthNote(HaSessionNotes.TTL, Long.toString(response.getTtl()));
+        sess.setAuthNote(HaSessionNotes.EXP, response.getExp()
+                .toString());
     }
 
     private void render(AuthenticationFlowContext ctx) {
         AuthenticationSessionModel as = ctx.getAuthenticationSession();
         String idStr = as.getAuthNote(HaSessionNotes.ECG_CHALLENGE_ID);
+        Long ttl = Long.parseLong(as.getAuthNote(HaSessionNotes.TTL));
+        Long exp = Long.parseLong(as.getAuthNote(HaSessionNotes.EXP));
         URI watchBase = ctx.getSession()
                 .getContext()
                 .getUri()
@@ -52,6 +57,8 @@ public class EcgAuthenticator implements Authenticator {
 
         Response page = ctx.form()
                 .setAttribute("id", idStr)
+                .setAttribute("ttl", ttl)
+                .setAttribute("exp", exp)
                 .setAttribute("rootAuthSessionId", as.getParentSession()
                         .getId())
                 .setAttribute("tabId", as.getTabId())

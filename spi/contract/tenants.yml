@@ -8,7 +8,7 @@ info:
     - All timestamps are UTC unless stated otherwise.
     - Ids are UUID v4 strings.
     - Short-lived resources (pairings/challenges) may expire; polling endpoints indicate current status.
-
+servers: []
 tags:
   - name: Pairing
     description: Create and poll device pairing flows (connect userId with theirs device).
@@ -158,6 +158,8 @@ components:
       required:
         - jti
         - jwt
+        - ttl
+        - exp
       properties:
         jti:
           type: string
@@ -168,6 +170,12 @@ components:
           type: string
           description: Signed token consumed by the mobile app to link this device.
           example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
+        ttl:
+          type: integer
+          format: int64
+        exp:
+          type: integer
+          format: int64
     CreateChallengeRequest:
       type: object
       required:
@@ -188,12 +196,20 @@ components:
       type: object
       required:
         - challengeId
+        - ttl
+        - exp
       properties:
         challengeId:
           type: string
           format: uuid
           description: Id used to poll challenge status.
           example: c2a4f2a1-5e1e-4a6d-8b7c-1f7e5fd3c2a1
+        ttl:
+          type: integer
+          format: int64
+        exp:
+          type: integer
+          format: int64
     StatusResponse:
       type: object
       required:
