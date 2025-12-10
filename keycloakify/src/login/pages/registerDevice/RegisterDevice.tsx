@@ -111,7 +111,12 @@ export default function RegisterDevice(props: Props) {
                         </div>
                     )}
                     <InfoBox hint={hint} type={alertType} />
-                    <ProgressBar percent={countdownPercentage} timeLeft={formattedTime} />
+                    {alertType === "info" && (
+                        <ProgressBar
+                            percent={countdownPercentage}
+                            timeLeft={formattedTime}
+                        />
+                    )}
                 </div>
 
                 <form method="post" action={url.loginAction} className={styles.actions}>

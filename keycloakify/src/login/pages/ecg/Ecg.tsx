@@ -98,7 +98,12 @@ export default function LoginEcg(props: Props) {
                 <span className={styles.sparkBottom} aria-hidden="true"></span>
                 <div className={styles.ecgPanel}>
                     <InfoBox hint={hint} type={alertType} onClick={handleCopy(id)} />
-                    <ProgressBar percent={countdownPercentage} timeLeft={formattedTime} />
+                    {alertType === "info" && (
+                        <ProgressBar
+                            percent={countdownPercentage}
+                            timeLeft={formattedTime}
+                        />
+                    )}
                     <form
                         method="post"
                         action={url.loginAction}
